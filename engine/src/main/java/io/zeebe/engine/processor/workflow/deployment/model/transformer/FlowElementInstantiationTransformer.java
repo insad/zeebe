@@ -10,7 +10,9 @@ package io.zeebe.engine.processor.workflow.deployment.model.transformer;
 import io.zeebe.engine.processor.workflow.deployment.model.element.AbstractFlowElement;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableActivity;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableBoundaryEvent;
+import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableCallActivity;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableCatchEventElement;
+import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableEndEvent;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableEventBasedGateway;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableExclusiveGateway;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableFlowElementContainer;
@@ -18,11 +20,13 @@ import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableFlo
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableReceiveTask;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableSequenceFlow;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableServiceTask;
+import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableStartEvent;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableWorkflow;
 import io.zeebe.engine.processor.workflow.deployment.model.transformation.ModelElementTransformer;
 import io.zeebe.engine.processor.workflow.deployment.model.transformation.TransformContext;
 import io.zeebe.model.bpmn.instance.Activity;
 import io.zeebe.model.bpmn.instance.BoundaryEvent;
+import io.zeebe.model.bpmn.instance.CallActivity;
 import io.zeebe.model.bpmn.instance.EndEvent;
 import io.zeebe.model.bpmn.instance.EventBasedGateway;
 import io.zeebe.model.bpmn.instance.ExclusiveGateway;
@@ -39,7 +43,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
-public class FlowElementInstantiationTransformer implements ModelElementTransformer<FlowElement> {
+public final class FlowElementInstantiationTransformer
+    implements ModelElementTransformer<FlowElement> {
 
   private static final Map<Class<?>, Function<String, AbstractFlowElement>> ELEMENT_FACTORIES;
 
@@ -48,7 +53,8 @@ public class FlowElementInstantiationTransformer implements ModelElementTransfor
 
     ELEMENT_FACTORIES.put(Activity.class, ExecutableActivity::new);
     ELEMENT_FACTORIES.put(BoundaryEvent.class, ExecutableBoundaryEvent::new);
-    ELEMENT_FACTORIES.put(EndEvent.class, ExecutableFlowNode::new);
+    ELEMENT_FACTORIES.put(CallActivity.class, ExecutableCallActivity::new);
+    ELEMENT_FACTORIES.put(EndEvent.class, ExecutableEndEvent::new);
     ELEMENT_FACTORIES.put(EventBasedGateway.class, ExecutableEventBasedGateway::new);
     ELEMENT_FACTORIES.put(ExclusiveGateway.class, ExecutableExclusiveGateway::new);
     ELEMENT_FACTORIES.put(IntermediateCatchEvent.class, ExecutableCatchEventElement::new);
@@ -56,7 +62,7 @@ public class FlowElementInstantiationTransformer implements ModelElementTransfor
     ELEMENT_FACTORIES.put(SequenceFlow.class, ExecutableSequenceFlow::new);
     ELEMENT_FACTORIES.put(ServiceTask.class, ExecutableServiceTask::new);
     ELEMENT_FACTORIES.put(ReceiveTask.class, ExecutableReceiveTask::new);
-    ELEMENT_FACTORIES.put(StartEvent.class, ExecutableCatchEventElement::new);
+    ELEMENT_FACTORIES.put(StartEvent.class, ExecutableStartEvent::new);
     ELEMENT_FACTORIES.put(SubProcess.class, ExecutableFlowElementContainer::new);
   }
 
@@ -66,7 +72,7 @@ public class FlowElementInstantiationTransformer implements ModelElementTransfor
   }
 
   @Override
-  public void transform(FlowElement element, TransformContext context) {
+  public void transform(final FlowElement element, final TransformContext context) {
     final ExecutableWorkflow workflow = context.getCurrentWorkflow();
     final Class<?> elementType = element.getElementType().getInstanceType();
 

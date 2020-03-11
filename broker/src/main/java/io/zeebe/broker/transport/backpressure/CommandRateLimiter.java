@@ -11,18 +11,23 @@ import com.netflix.concurrency.limits.limiter.AbstractLimiter;
 import io.zeebe.broker.Loggers;
 import io.zeebe.protocol.record.intent.Intent;
 import io.zeebe.protocol.record.intent.JobIntent;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class CommandRateLimiter extends AbstractLimiter<Intent> implements RequestLimiter<Intent> {
+public final class CommandRateLimiter extends AbstractLimiter<Intent>
+    implements RequestLimiter<Intent> {
 
+  private static final Set<? extends Intent> WHITE_LISTED_COMMANDS =
+      EnumSet.of(JobIntent.COMPLETE, JobIntent.FAIL);
   private final Map<ListenerId, Listener> responseListeners = new ConcurrentHashMap<>();
   private final int partitionId;
   private final BackpressureMetrics metrics = new BackpressureMetrics();
 
-  protected CommandRateLimiter(CommandRateLimiterBuilder builder, int partitionId) {
+  protected CommandRateLimiter(final CommandRateLimiterBuilder builder, final int partitionId) {
     super(builder);
     this.partitionId = partitionId;
     metrics.setInflight(partitionId, 0);
@@ -30,21 +35,21 @@ public class CommandRateLimiter extends AbstractLimiter<Intent> implements Reque
   }
 
   @Override
-  public Optional<Listener> acquire(Intent intent) {
-    if (getInflight() >= getLimit() && intent != JobIntent.COMPLETE) {
+  public Optional<Listener> acquire(final Intent intent) {
+    if (getInflight() >= getLimit() && !WHITE_LISTED_COMMANDS.contains(intent)) {
       return createRejectedListener();
     }
     final Listener listener = createListener();
     return Optional.of(listener);
   }
 
-  private void registerListener(int streamId, long requestId, Listener listener) {
+  private void registerListener(final int streamId, final long requestId, final Listener listener) {
     // assumes the pair <streamId, requestId> is unique.
     responseListeners.put(new ListenerId(streamId, requestId), listener);
   }
 
   @Override
-  public boolean tryAcquire(int streamId, long requestId, Intent context) {
+  public boolean tryAcquire(final int streamId, final long requestId, final Intent context) {
     final Optional<Listener> acquired = acquire(context);
     return acquired
         .map(
@@ -57,7 +62,7 @@ public class CommandRateLimiter extends AbstractLimiter<Intent> implements Reque
   }
 
   @Override
-  public void onResponse(int streamId, long requestId) {
+  public void onResponse(final int streamId, final long requestId) {
     final Listener listener = responseListeners.remove(new ListenerId(streamId, requestId));
     if (listener != null) {
       listener.onSuccess();
@@ -73,7 +78,7 @@ public class CommandRateLimiter extends AbstractLimiter<Intent> implements Reque
   }
 
   @Override
-  public void onIgnore(int streamId, long requestId) {
+  public void onIgnore(final int streamId, final long requestId) {
     final Listener listener = responseListeners.remove(new ListenerId(streamId, requestId));
     if (listener != null) {
       listener.onIgnore();
@@ -87,7 +92,7 @@ public class CommandRateLimiter extends AbstractLimiter<Intent> implements Reque
   }
 
   @Override
-  protected void onNewLimit(int newLimit) {
+  protected void onNewLimit(final int newLimit) {
     super.onNewLimit(newLimit);
     metrics.setNewLimit(partitionId, newLimit);
   }
@@ -104,7 +109,7 @@ public class CommandRateLimiter extends AbstractLimiter<Intent> implements Reque
       return this;
     }
 
-    public CommandRateLimiter build(int partitionId) {
+    public CommandRateLimiter build(final int partitionId) {
       return new CommandRateLimiter(this, partitionId);
     }
   }
@@ -113,7 +118,7 @@ public class CommandRateLimiter extends AbstractLimiter<Intent> implements Reque
     private final int streamId;
     private final long requestId;
 
-    ListenerId(int streamId, long requestId) {
+    ListenerId(final int streamId, final long requestId) {
       this.streamId = streamId;
       this.requestId = requestId;
     }
@@ -124,7 +129,7 @@ public class CommandRateLimiter extends AbstractLimiter<Intent> implements Reque
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
       if (this == o) {
         return true;
       }

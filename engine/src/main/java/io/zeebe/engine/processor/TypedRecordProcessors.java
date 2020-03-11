@@ -18,40 +18,43 @@ public final class TypedRecordProcessors {
 
   private final RecordProcessorMap recordProcessorMap = new RecordProcessorMap();
   private final List<StreamProcessorLifecycleAware> lifecycleListeners = new ArrayList<>();
+  private final KeyGenerator keyGenerator;
 
-  private TypedRecordProcessors() {}
+  private TypedRecordProcessors(final KeyGenerator keyGenerator) {
+    this.keyGenerator = keyGenerator;
+  }
 
-  public static TypedRecordProcessors processors() {
-    return new TypedRecordProcessors();
+  public static TypedRecordProcessors processors(final KeyGenerator keyGenerator) {
+    return new TypedRecordProcessors(keyGenerator);
   }
 
   // TODO: could remove the ValueType argument as it follows from the intent
   public TypedRecordProcessors onEvent(
-      ValueType valueType, Intent intent, TypedRecordProcessor<?> processor) {
+      final ValueType valueType, final Intent intent, final TypedRecordProcessor<?> processor) {
     return onRecord(RecordType.EVENT, valueType, intent, processor);
   }
 
   private TypedRecordProcessors onRecord(
-      RecordType recordType,
-      ValueType valueType,
-      Intent intent,
-      TypedRecordProcessor<?> processor) {
+      final RecordType recordType,
+      final ValueType valueType,
+      final Intent intent,
+      final TypedRecordProcessor<?> processor) {
     recordProcessorMap.put(recordType, valueType, intent.value(), processor);
 
     return this;
   }
 
   public TypedRecordProcessors onCommand(
-      ValueType valueType, Intent intent, TypedRecordProcessor<?> processor) {
+      final ValueType valueType, final Intent intent, final TypedRecordProcessor<?> processor) {
     return onRecord(RecordType.COMMAND, valueType, intent, processor);
   }
 
   public <T extends UnifiedRecordValue> TypedRecordProcessors onCommand(
-      ValueType valueType, Intent intent, CommandProcessor<T> commandProcessor) {
-    return onCommand(valueType, intent, new CommandProcessorImpl<>(commandProcessor));
+      final ValueType valueType, final Intent intent, final CommandProcessor<T> commandProcessor) {
+    return onCommand(valueType, intent, new CommandProcessorImpl<>(keyGenerator, commandProcessor));
   }
 
-  public TypedRecordProcessors withListener(StreamProcessorLifecycleAware listener) {
+  public TypedRecordProcessors withListener(final StreamProcessorLifecycleAware listener) {
     this.lifecycleListeners.add(listener);
     return this;
   }

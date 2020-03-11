@@ -9,8 +9,10 @@ package io.zeebe.gateway;
 
 import io.atomix.cluster.AtomixCluster;
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
+import io.atomix.core.Atomix;
 import io.atomix.utils.net.Address;
 import io.prometheus.client.exporter.HTTPServer;
+import io.prometheus.client.hotspot.DefaultExports;
 import io.zeebe.gateway.impl.broker.BrokerClient;
 import io.zeebe.gateway.impl.broker.BrokerClientImpl;
 import io.zeebe.gateway.impl.configuration.ClusterCfg;
@@ -28,7 +30,7 @@ public class StandaloneGateway {
   private final GatewayCfg gatewayCfg;
   private final ActorScheduler actorScheduler;
 
-  public StandaloneGateway(GatewayCfg gatewayCfg) {
+  public StandaloneGateway(final GatewayCfg gatewayCfg) {
     atomixCluster = createAtomixCluster(gatewayCfg.getCluster());
     actorScheduler = createActorScheduler(gatewayCfg);
     final Function<GatewayCfg, BrokerClient> brokerClientFactory =
@@ -37,9 +39,9 @@ public class StandaloneGateway {
     this.gatewayCfg = gatewayCfg;
   }
 
-  private AtomixCluster createAtomixCluster(ClusterCfg clusterCfg) {
-    final AtomixCluster atomixCluster =
-        AtomixCluster.builder()
+  private AtomixCluster createAtomixCluster(final ClusterCfg clusterCfg) {
+    final var atomix =
+        Atomix.builder()
             .withMemberId(clusterCfg.getMemberId())
             .withAddress(Address.from(clusterCfg.getHost(), clusterCfg.getPort()))
             .withClusterId(clusterCfg.getClusterName())
@@ -49,12 +51,11 @@ public class StandaloneGateway {
                     .build())
             .build();
 
-    atomixCluster.start();
-
-    return atomixCluster;
+    atomix.start();
+    return atomix;
   }
 
-  private ActorScheduler createActorScheduler(GatewayCfg configuration) {
+  private ActorScheduler createActorScheduler(final GatewayCfg configuration) {
     final ActorScheduler actorScheduler =
         ActorScheduler.newActorScheduler()
             .setCpuBoundActorThreadCount(configuration.getThreads().getManagementThreads())
@@ -73,6 +74,7 @@ public class StandaloneGateway {
       monitoringServer =
           new HTTPServer(
               gatewayCfg.getMonitoring().getHost(), gatewayCfg.getMonitoring().getPort());
+      DefaultExports.initialize();
     }
 
     gateway.listenAndServe();
@@ -84,13 +86,13 @@ public class StandaloneGateway {
     }
   }
 
-  public static void main(String args[]) throws Exception {
+  public static void main(final String[] args) throws Exception {
     final GatewayCfg gatewayCfg = initConfiguration(args);
     gatewayCfg.init();
     new StandaloneGateway(gatewayCfg).run();
   }
 
-  private static GatewayCfg initConfiguration(String[] args) {
+  private static GatewayCfg initConfiguration(final String[] args) {
     if (args.length >= 1) {
       String configFileLocation = args[0];
 

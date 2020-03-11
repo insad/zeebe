@@ -14,13 +14,18 @@ import java.util.Collections;
 import java.util.List;
 import org.agrona.collections.IntArrayList;
 
-public class ClusterCfg implements ConfigurationEntry {
+public final class ClusterCfg implements ConfigurationEntry {
   public static final List<String> DEFAULT_CONTACT_POINTS = Collections.emptyList();
   public static final int DEFAULT_NODE_ID = 0;
   public static final int DEFAULT_PARTITIONS_COUNT = 1;
   public static final int DEFAULT_REPLICATION_FACTOR = 1;
   public static final int DEFAULT_CLUSTER_SIZE = 1;
   public static final String DEFAULT_CLUSTER_NAME = "zeebe-cluster";
+
+  // the following values are from atomix per default
+  private static final long DEFAULT_GOSSIP_FAILURE_TIMEOUT = 10_000;
+  private static final int DEFAULT_GOSSIP_INTERVAL = 250;
+  private static final int DEFAULT_GOSSIP_PROBE_INTERVAL = 1000;
 
   private List<String> initialContactPoints = DEFAULT_CONTACT_POINTS;
 
@@ -30,6 +35,11 @@ public class ClusterCfg implements ConfigurationEntry {
   private int replicationFactor = DEFAULT_REPLICATION_FACTOR;
   private int clusterSize = DEFAULT_CLUSTER_SIZE;
   private String clusterName = DEFAULT_CLUSTER_NAME;
+
+  // We do not add this to the toString or env - to hide it from the config
+  private long gossipFailureTimeout = DEFAULT_GOSSIP_FAILURE_TIMEOUT;
+  private long gossipInterval = DEFAULT_GOSSIP_INTERVAL;
+  private long gossipProbeInterval = DEFAULT_GOSSIP_PROBE_INTERVAL;
 
   @Override
   public void init(
@@ -112,8 +122,32 @@ public class ClusterCfg implements ConfigurationEntry {
     return clusterName;
   }
 
-  public void setClusterName(String clusterName) {
+  public void setClusterName(final String clusterName) {
     this.clusterName = clusterName;
+  }
+
+  public long getGossipFailureTimeout() {
+    return gossipFailureTimeout;
+  }
+
+  public void setGossipFailureTimeout(final long gossipFailureTimeout) {
+    this.gossipFailureTimeout = gossipFailureTimeout;
+  }
+
+  public long getGossipInterval() {
+    return gossipInterval;
+  }
+
+  public void setGossipInterval(final long gossipInterval) {
+    this.gossipInterval = gossipInterval;
+  }
+
+  public long getGossipProbeInterval() {
+    return gossipProbeInterval;
+  }
+
+  public void setGossipProbeInterval(final long gossipProbeInterval) {
+    this.gossipProbeInterval = gossipProbeInterval;
   }
 
   @Override

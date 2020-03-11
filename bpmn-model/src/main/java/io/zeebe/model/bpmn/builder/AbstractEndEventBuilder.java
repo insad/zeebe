@@ -25,7 +25,7 @@ public abstract class AbstractEndEventBuilder<B extends AbstractEndEventBuilder<
     extends AbstractThrowEventBuilder<B, EndEvent> {
 
   protected AbstractEndEventBuilder(
-      BpmnModelInstance modelInstance, EndEvent element, Class<?> selfType) {
+      final BpmnModelInstance modelInstance, final EndEvent element, final Class<?> selfType) {
     super(modelInstance, element, selfType);
   }
 
@@ -36,10 +36,37 @@ public abstract class AbstractEndEventBuilder<B extends AbstractEndEventBuilder<
    * @param errorCode the code of the error
    * @return the builder object
    */
-  public B error(String errorCode) {
+  public B error(final String errorCode) {
     final ErrorEventDefinition errorEventDefinition = createErrorEventDefinition(errorCode);
     element.getEventDefinitions().add(errorEventDefinition);
 
     return myself;
+  }
+
+  /**
+   * Creates an error event definition with an unique id and returns a builder for the error event
+   * definition.
+   *
+   * @return the error event definition builder object
+   */
+  public ErrorEventDefinitionBuilder errorEventDefinition(final String id) {
+    final ErrorEventDefinition errorEventDefinition = createEmptyErrorEventDefinition();
+    if (id != null) {
+      errorEventDefinition.setId(id);
+    }
+
+    element.getEventDefinitions().add(errorEventDefinition);
+    return new ErrorEventDefinitionBuilder(modelInstance, errorEventDefinition);
+  }
+
+  /**
+   * Creates an error event definition and returns a builder for the error event definition.
+   *
+   * @return the error event definition builder object
+   */
+  public ErrorEventDefinitionBuilder errorEventDefinition() {
+    final ErrorEventDefinition errorEventDefinition = createEmptyErrorEventDefinition();
+    element.getEventDefinitions().add(errorEventDefinition);
+    return new ErrorEventDefinitionBuilder(modelInstance, errorEventDefinition);
   }
 }

@@ -10,19 +10,21 @@ package io.zeebe.broker.it.clustering.topology;
 import static io.zeebe.protocol.Protocol.START_PARTITION_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.zeebe.broker.it.GrpcClientRule;
+import io.zeebe.broker.Broker;
 import io.zeebe.broker.it.clustering.ClusteringRule;
+import io.zeebe.broker.it.util.GrpcClientRule;
 import io.zeebe.client.api.response.BrokerInfo;
 import io.zeebe.client.api.response.PartitionBrokerRole;
 import io.zeebe.client.api.response.PartitionInfo;
 import io.zeebe.client.api.response.Topology;
+import io.zeebe.gateway.Gateway;
 import java.util.List;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.rules.Timeout;
 
-public class TopologyClusterTest {
+public final class TopologyClusterTest {
 
   private static final Timeout TEST_TIMEOUT = Timeout.seconds(120);
   private static final ClusteringRule CLUSTERING_RULE = new ClusteringRule();
@@ -42,9 +44,7 @@ public class TopologyClusterTest {
     final List<BrokerInfo> brokers = topology.getBrokers();
 
     assertThat(brokers.size()).isEqualTo(3);
-    assertThat(brokers)
-        .extracting(brokerInfo -> brokerInfo.getNodeId())
-        .containsExactlyInAnyOrder(0, 1, 2);
+    assertThat(brokers).extracting(BrokerInfo::getNodeId).containsExactlyInAnyOrder(0, 1, 2);
   }
 
   @Test
@@ -67,7 +67,7 @@ public class TopologyClusterTest {
     assertPartitionInTopology(brokers, START_PARTITION_ID + 2);
   }
 
-  private void assertPartitionInTopology(List<BrokerInfo> brokers, int partition) {
+  private void assertPartitionInTopology(final List<BrokerInfo> brokers, final int partition) {
     assertThat(brokers)
         .flatExtracting(BrokerInfo::getPartitions)
         .filteredOn(p -> p.getPartitionId() == partition)
@@ -85,5 +85,14 @@ public class TopologyClusterTest {
     assertThat(topology.getClusterSize()).isEqualTo(CLUSTERING_RULE.getClusterSize());
     assertThat(topology.getPartitionsCount()).isEqualTo(CLUSTERING_RULE.getPartitionCount());
     assertThat(topology.getReplicationFactor()).isEqualTo(CLUSTERING_RULE.getReplicationFactor());
+    // NOTE: this fails in Intellij because we don't have access to the package version but it works
+    // when run from the CLI
+    assertThat(topology.getGatewayVersion())
+        .isEqualTo(Gateway.class.getPackage().getImplementationVersion());
+
+    for (final BrokerInfo broker : topology.getBrokers()) {
+      assertThat(broker.getVersion())
+          .isEqualTo(Broker.class.getPackage().getImplementationVersion());
+    }
   }
 }

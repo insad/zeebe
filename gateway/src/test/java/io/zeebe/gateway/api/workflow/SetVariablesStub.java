@@ -7,24 +7,29 @@
  */
 package io.zeebe.gateway.api.workflow;
 
-import io.zeebe.gateway.api.util.StubbedGateway;
-import io.zeebe.gateway.api.util.StubbedGateway.RequestStub;
+import io.zeebe.gateway.api.util.StubbedBrokerClient;
+import io.zeebe.gateway.api.util.StubbedBrokerClient.RequestStub;
 import io.zeebe.gateway.impl.broker.request.BrokerSetVariablesRequest;
 import io.zeebe.gateway.impl.broker.response.BrokerResponse;
 import io.zeebe.protocol.impl.record.value.variable.VariableDocumentRecord;
 
-public class SetVariablesStub
+public final class SetVariablesStub
     implements RequestStub<BrokerSetVariablesRequest, BrokerResponse<VariableDocumentRecord>> {
 
+  private static final long KEY = 12345L;
+
   @Override
-  public void registerWith(StubbedGateway gateway) {
+  public void registerWith(final StubbedBrokerClient gateway) {
     gateway.registerHandler(BrokerSetVariablesRequest.class, this);
   }
 
+  public long getKey() {
+    return KEY;
+  }
+
   @Override
-  public BrokerResponse<VariableDocumentRecord> handle(BrokerSetVariablesRequest request)
+  public BrokerResponse<VariableDocumentRecord> handle(final BrokerSetVariablesRequest request)
       throws Exception {
-    return new BrokerResponse<>(
-        new VariableDocumentRecord(), request.getPartitionId(), request.getKey());
+    return new BrokerResponse<>(new VariableDocumentRecord(), request.getPartitionId(), KEY);
   }
 }

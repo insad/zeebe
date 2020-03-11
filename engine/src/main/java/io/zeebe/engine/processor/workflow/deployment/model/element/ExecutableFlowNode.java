@@ -7,7 +7,7 @@
  */
 package io.zeebe.engine.processor.workflow.deployment.model.element;
 
-import io.zeebe.msgpack.mapping.Mapping;
+import io.zeebe.msgpack.mapping.Mappings;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,10 +16,10 @@ public class ExecutableFlowNode extends AbstractFlowElement {
   private final List<ExecutableSequenceFlow> incoming = new ArrayList<>();
   private final List<ExecutableSequenceFlow> outgoing = new ArrayList<>();
 
-  private Mapping[] inputMappings = new Mapping[0];
-  private Mapping[] outputMappings = new Mapping[0];
+  private Mappings inputMappings = new Mappings();
+  private Mappings outputMappings = new Mappings();
 
-  public ExecutableFlowNode(String id) {
+  public ExecutableFlowNode(final String id) {
     super(id);
   }
 
@@ -27,31 +27,31 @@ public class ExecutableFlowNode extends AbstractFlowElement {
     return outgoing;
   }
 
-  public void addOutgoing(ExecutableSequenceFlow flow) {
-    this.outgoing.add(flow);
+  public void addOutgoing(final ExecutableSequenceFlow flow) {
+    outgoing.add(flow);
   }
 
   public List<ExecutableSequenceFlow> getIncoming() {
     return incoming;
   }
 
-  public void addIncoming(ExecutableSequenceFlow flow) {
-    this.incoming.add(flow);
+  public void addIncoming(final ExecutableSequenceFlow flow) {
+    incoming.add(flow);
   }
 
-  public Mapping[] getInputMappings() {
+  public Mappings getInputMappings() {
     return inputMappings;
   }
 
-  public void setInputMappings(Mapping[] inputMappings) {
+  public void setInputMappings(final Mappings inputMappings) {
     this.inputMappings = inputMappings;
   }
 
-  public Mapping[] getOutputMappings() {
+  public Mappings getOutputMappings() {
     return outputMappings;
   }
 
-  public void setOutputMappings(Mapping[] outputMappings) {
+  public void setOutputMappings(final Mappings outputMappings) {
     this.outputMappings = outputMappings;
   }
 }

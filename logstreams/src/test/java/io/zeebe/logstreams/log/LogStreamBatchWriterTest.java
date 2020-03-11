@@ -11,10 +11,12 @@ import static io.zeebe.util.buffer.BufferUtil.wrapString;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.zeebe.logstreams.impl.LoggedEventImpl;
+import io.zeebe.logstreams.impl.log.LoggedEventImpl;
 import io.zeebe.logstreams.util.LogStreamReaderRule;
 import io.zeebe.logstreams.util.LogStreamRule;
 import io.zeebe.logstreams.util.LogStreamWriterRule;
+import io.zeebe.logstreams.util.SynchronousLogStream;
+import io.zeebe.test.util.TestUtil;
 import io.zeebe.util.buffer.BufferUtil;
 import io.zeebe.util.buffer.DirectBufferWriter;
 import io.zeebe.util.sched.future.ActorFuture;
@@ -22,6 +24,7 @@ import io.zeebe.util.sched.testing.ControlledActorSchedulerRule;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import org.agrona.DirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.Before;
@@ -31,7 +34,7 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
-public class LogStreamBatchWriterTest {
+public final class LogStreamBatchWriterTest {
   private static final DirectBuffer EVENT_VALUE_1 = wrapString("foo");
   private static final DirectBuffer EVENT_VALUE_2 = wrapString("bar");
   private static final DirectBuffer EVENT_METADATA_1 = wrapString("foobar");
@@ -43,10 +46,10 @@ public class LogStreamBatchWriterTest {
 
   @Rule public ExpectedException expectedException = ExpectedException.none();
 
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
-  public LogStreamRule logStreamRule = LogStreamRule.startByDefault(temporaryFolder);
-  public LogStreamReaderRule readerRule = new LogStreamReaderRule(logStreamRule);
-  public LogStreamWriterRule writerRule = new LogStreamWriterRule(logStreamRule);
+  public final TemporaryFolder temporaryFolder = new TemporaryFolder();
+  public final LogStreamRule logStreamRule = LogStreamRule.startByDefault(temporaryFolder);
+  public final LogStreamReaderRule readerRule = new LogStreamReaderRule(logStreamRule);
+  public final LogStreamWriterRule writerRule = new LogStreamWriterRule(logStreamRule);
 
   @Rule
   public RuleChain ruleChain =
@@ -59,7 +62,8 @@ public class LogStreamBatchWriterTest {
 
   @Before
   public void setUp() {
-    writer = new LogStreamBatchWriterImpl(logStreamRule.getLogStream());
+    final SynchronousLogStream logStream = logStreamRule.getLogStream();
+    writer = logStream.newLogStreamBatchWriter();
   }
 
   private List<LoggedEvent> getWrittenEvents(final long position) {
@@ -106,10 +110,15 @@ public class LogStreamBatchWriterTest {
     return new UnsafeBuffer(buffer, offset, length);
   }
 
+  private long write(final Consumer<LogStreamBatchWriter> consumer) {
+    consumer.accept(writer);
+    return TestUtil.doRepeatedly(() -> writer.tryWrite()).until(pos -> pos > 0);
+  }
+
   @Test
   public void shouldReturnPositionOfSingleEvent() {
     // when
-    final long position = writer.event().keyNull().value(EVENT_VALUE_1).done().tryWrite();
+    final long position = write(w -> w.event().keyNull().value(EVENT_VALUE_1).done());
 
     // then
     assertThat(position).isGreaterThan(0);
@@ -123,16 +132,16 @@ public class LogStreamBatchWriterTest {
   public void shouldReturnPositionOfLastEvent() {
     // when
     final long position =
-        writer
-            .event()
-            .key(1)
-            .value(EVENT_VALUE_1)
-            .done()
-            .event()
-            .key(2)
-            .value(EVENT_VALUE_2)
-            .done()
-            .tryWrite();
+        write(
+            w ->
+                w.event()
+                    .key(1)
+                    .value(EVENT_VALUE_1)
+                    .done()
+                    .event()
+                    .key(2)
+                    .value(EVENT_VALUE_2)
+                    .done());
 
     // then
     assertThat(position).isGreaterThan(0);
@@ -146,16 +155,16 @@ public class LogStreamBatchWriterTest {
   public void shouldWriteEventWithValueBuffer() {
     // when
     final long position =
-        writer
-            .event()
-            .key(1)
-            .value(EVENT_VALUE_1)
-            .done()
-            .event()
-            .key(2)
-            .value(EVENT_VALUE_2)
-            .done()
-            .tryWrite();
+        write(
+            w ->
+                w.event()
+                    .key(1)
+                    .value(EVENT_VALUE_1)
+                    .done()
+                    .event()
+                    .key(2)
+                    .value(EVENT_VALUE_2)
+                    .done());
 
     // then
     final List<LoggedEvent> events = getWrittenEvents(position);
@@ -167,16 +176,16 @@ public class LogStreamBatchWriterTest {
   public void shouldWriteEventWithValueBufferPartially() {
     // when
     final long position =
-        writer
-            .event()
-            .key(1)
-            .value(EVENT_VALUE_1, 1, 2)
-            .done()
-            .event()
-            .key(2)
-            .value(EVENT_VALUE_2, 1, 2)
-            .done()
-            .tryWrite();
+        write(
+            w ->
+                w.event()
+                    .key(1)
+                    .value(EVENT_VALUE_1, 1, 2)
+                    .done()
+                    .event()
+                    .key(2)
+                    .value(EVENT_VALUE_2, 1, 2)
+                    .done());
 
     // then
     final List<LoggedEvent> events = getWrittenEvents(position);
@@ -188,16 +197,16 @@ public class LogStreamBatchWriterTest {
   public void shouldWriteEventWithValueWriter() {
     // when
     final long position =
-        writer
-            .event()
-            .key(1)
-            .valueWriter(new DirectBufferWriter().wrap(EVENT_VALUE_1))
-            .done()
-            .event()
-            .key(2)
-            .valueWriter(new DirectBufferWriter().wrap(EVENT_VALUE_2))
-            .done()
-            .tryWrite();
+        write(
+            w ->
+                w.event()
+                    .key(1)
+                    .valueWriter(new DirectBufferWriter().wrap(EVENT_VALUE_1))
+                    .done()
+                    .event()
+                    .key(2)
+                    .valueWriter(new DirectBufferWriter().wrap(EVENT_VALUE_2))
+                    .done());
 
     // then
     final List<LoggedEvent> events = getWrittenEvents(position);
@@ -209,18 +218,18 @@ public class LogStreamBatchWriterTest {
   public void shouldWriteEventWithMetadataBuffer() {
     // when
     final long position =
-        writer
-            .event()
-            .key(1)
-            .value(EVENT_VALUE_1)
-            .metadata(EVENT_METADATA_1)
-            .done()
-            .event()
-            .key(2)
-            .value(EVENT_VALUE_2)
-            .metadata(EVENT_METADATA_2)
-            .done()
-            .tryWrite();
+        write(
+            w ->
+                w.event()
+                    .key(1)
+                    .value(EVENT_VALUE_1)
+                    .metadata(EVENT_METADATA_1)
+                    .done()
+                    .event()
+                    .key(2)
+                    .value(EVENT_VALUE_2)
+                    .metadata(EVENT_METADATA_2)
+                    .done());
 
     // then
     final List<LoggedEvent> events = getWrittenEvents(position);
@@ -232,19 +241,18 @@ public class LogStreamBatchWriterTest {
   public void shouldWriteEventWithMetadataBufferPartially() {
     // when
     final long position =
-        writer
-            .event()
-            .key(1)
-            .value(EVENT_VALUE_1)
-            .metadata(EVENT_METADATA_1, 1, 2)
-            .done()
-            .event()
-            .key(2)
-            .value(EVENT_VALUE_2)
-            .metadata(EVENT_METADATA_2, 1, 2)
-            .done()
-            .tryWrite();
-
+        write(
+            w ->
+                w.event()
+                    .key(1)
+                    .value(EVENT_VALUE_1)
+                    .metadata(EVENT_METADATA_1, 1, 2)
+                    .done()
+                    .event()
+                    .key(2)
+                    .value(EVENT_VALUE_2)
+                    .metadata(EVENT_METADATA_2, 1, 2)
+                    .done());
     // then
     final List<LoggedEvent> events = getWrittenEvents(position);
     assertThat(getMetadataBuffer(events.get(0)))
@@ -257,18 +265,18 @@ public class LogStreamBatchWriterTest {
   public void shouldWriteEventWithMetadataWriter() {
     // when
     final long position =
-        writer
-            .event()
-            .key(1)
-            .value(EVENT_VALUE_1)
-            .metadataWriter(new DirectBufferWriter().wrap(EVENT_METADATA_1))
-            .done()
-            .event()
-            .key(2)
-            .value(EVENT_VALUE_2)
-            .metadataWriter(new DirectBufferWriter().wrap(EVENT_METADATA_2))
-            .done()
-            .tryWrite();
+        write(
+            w ->
+                w.event()
+                    .key(1)
+                    .value(EVENT_VALUE_1)
+                    .metadataWriter(new DirectBufferWriter().wrap(EVENT_METADATA_1))
+                    .done()
+                    .event()
+                    .key(2)
+                    .value(EVENT_VALUE_2)
+                    .metadataWriter(new DirectBufferWriter().wrap(EVENT_METADATA_2))
+                    .done());
 
     // then
     final List<LoggedEvent> events = getWrittenEvents(position);
@@ -280,16 +288,16 @@ public class LogStreamBatchWriterTest {
   public void shouldWriteEventWithKey() {
     // when
     final long position =
-        writer
-            .event()
-            .key(123L)
-            .value(EVENT_VALUE_1)
-            .done()
-            .event()
-            .key(456L)
-            .value(EVENT_VALUE_2)
-            .done()
-            .tryWrite();
+        write(
+            w ->
+                w.event()
+                    .key(123L)
+                    .value(EVENT_VALUE_1)
+                    .done()
+                    .event()
+                    .key(456L)
+                    .value(EVENT_VALUE_2)
+                    .done());
 
     // then
     assertThat(getWrittenEvents(position))
@@ -301,17 +309,17 @@ public class LogStreamBatchWriterTest {
   public void shouldWriteEventWithSourceEvent() {
     // when
     final long position =
-        writer
-            .sourceRecordPosition(123L)
-            .event()
-            .key(1)
-            .value(EVENT_VALUE_1)
-            .done()
-            .event()
-            .key(2)
-            .value(EVENT_VALUE_2)
-            .done()
-            .tryWrite();
+        write(
+            w ->
+                w.sourceRecordPosition(123L)
+                    .event()
+                    .key(1)
+                    .value(EVENT_VALUE_1)
+                    .done()
+                    .event()
+                    .key(2)
+                    .value(EVENT_VALUE_2)
+                    .done());
 
     // then
     final List<LoggedEvent> events = getWrittenEvents(position);
@@ -324,16 +332,16 @@ public class LogStreamBatchWriterTest {
   public void shouldWriteEventWithoutSourceEvent() {
     // when
     final long position =
-        writer
-            .event()
-            .key(1)
-            .value(EVENT_VALUE_1)
-            .done()
-            .event()
-            .key(2)
-            .value(EVENT_VALUE_2)
-            .done()
-            .tryWrite();
+        write(
+            w ->
+                w.event()
+                    .key(1)
+                    .value(EVENT_VALUE_1)
+                    .done()
+                    .event()
+                    .key(2)
+                    .value(EVENT_VALUE_2)
+                    .done());
 
     // then
     final List<LoggedEvent> events = getWrittenEvents(position);
@@ -352,16 +360,16 @@ public class LogStreamBatchWriterTest {
     final ActorFuture<Long> position =
         writerScheduler.call(
             () ->
-                writer
-                    .event()
-                    .key(1)
-                    .value(EVENT_VALUE_1)
-                    .done()
-                    .event()
-                    .key(2)
-                    .value(EVENT_VALUE_2)
-                    .done()
-                    .tryWrite());
+                write(
+                    w ->
+                        w.event()
+                            .key(1)
+                            .value(EVENT_VALUE_1)
+                            .done()
+                            .event()
+                            .key(2)
+                            .value(EVENT_VALUE_2)
+                            .done()));
     writerScheduler.workUntilDone();
 
     // then
@@ -374,15 +382,15 @@ public class LogStreamBatchWriterTest {
   public void shouldNotFailToWriteEventWithoutKey() {
     // when
     final long position =
-        writer
-            .event()
-            .keyNull()
-            .value(EVENT_VALUE_1)
-            .done()
-            .event()
-            .value(EVENT_VALUE_2)
-            .done()
-            .tryWrite();
+        write(
+            w ->
+                w.event()
+                    .keyNull()
+                    .value(EVENT_VALUE_1)
+                    .done()
+                    .event()
+                    .value(EVENT_VALUE_2)
+                    .done());
 
     // then
     assertThat(getWrittenEvents(position)).extracting(LoggedEvent::getKey).contains(-1L);

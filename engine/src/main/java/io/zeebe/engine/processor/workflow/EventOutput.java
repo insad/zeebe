@@ -8,6 +8,7 @@
 package io.zeebe.engine.processor.workflow;
 
 import io.zeebe.engine.processor.KeyGenerator;
+import io.zeebe.engine.processor.TypedResponseWriter;
 import io.zeebe.engine.processor.TypedStreamWriter;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableFlowElement;
 import io.zeebe.engine.state.instance.StoredRecord.Purpose;
@@ -22,6 +23,7 @@ public class EventOutput {
   private final KeyGenerator keyGenerator;
 
   private TypedStreamWriter streamWriter;
+  private TypedResponseWriter responseWriter;
 
   public EventOutput(final WorkflowEngineState materializedState, final KeyGenerator keyGenerator) {
     this.materializedState = materializedState;
@@ -81,7 +83,9 @@ public class EventOutput {
   }
 
   public long deferRecord(
-      long scopeKey, WorkflowInstanceRecord value, WorkflowInstanceIntent intent) {
+      final long scopeKey,
+      final WorkflowInstanceRecord value,
+      final WorkflowInstanceIntent intent) {
     final long elementInstanceKey = keyGenerator.nextKey();
     materializedState.deferRecord(elementInstanceKey, scopeKey, value, intent);
 
@@ -101,7 +105,17 @@ public class EventOutput {
   }
 
   public void storeFailedRecord(
-      long key, WorkflowInstanceRecord recordValue, WorkflowInstanceIntent intent) {
+      final long key,
+      final WorkflowInstanceRecord recordValue,
+      final WorkflowInstanceIntent intent) {
     materializedState.storeFailedRecord(key, recordValue, intent);
+  }
+
+  public TypedResponseWriter getResponseWriter() {
+    return responseWriter;
+  }
+
+  public void setResponseWriter(final TypedResponseWriter responseWriter) {
+    this.responseWriter = responseWriter;
   }
 }

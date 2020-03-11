@@ -8,7 +8,7 @@
   <parent>
     <groupId>io.zeebe</groupId>
     <artifactId>zeebe-parent</artifactId>
-    <version>0.21.0-SNAPSHOT</version>
+    <version>0.22.2-SNAPSHOT</version>
     <relativePath>../parent</relativePath>
   </parent>
 
@@ -56,11 +56,6 @@
     <dependency>
       <groupId>io.zeebe</groupId>
       <artifactId>zeebe-transport</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>io.zeebe</groupId>
-      <artifactId>zeebe-service-container</artifactId>
     </dependency>
 
     <dependency>
@@ -139,11 +134,6 @@
     </dependency>
 
     <dependency>
-      <groupId>io.zeebe</groupId>
-      <artifactId>zeebe-dispatcher</artifactId>
-    </dependency>
-
-    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
@@ -180,12 +170,17 @@
 
     <dependency>
       <groupId>io.zeebe</groupId>
+      <artifactId>atomix-raft</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.zeebe</groupId>
       <artifactId>atomix-primitive</artifactId>
     </dependency>
 
     <dependency>
       <groupId>io.zeebe</groupId>
-      <artifactId>atomix-raft</artifactId>
+      <artifactId>atomix-storage</artifactId>
     </dependency>
 
     <dependency>
@@ -233,10 +228,18 @@
       <classifier>tests</classifier>
       <scope>test</scope>
     </dependency>
+
+    <dependency>
+      <groupId>io.zeebe</groupId>
+      <artifactId>zeebe-logstreams</artifactId>
+      <type>test-jar</type>
+      <classifier>tests</classifier>
+      <scope>test</scope>
+    </dependency>
+
     <dependency>
       <groupId>com.netflix.concurrency-limits</groupId>
       <artifactId>concurrency-limits-core</artifactId>
-      <version>0.3.6</version>
     </dependency>
 
   </dependencies>

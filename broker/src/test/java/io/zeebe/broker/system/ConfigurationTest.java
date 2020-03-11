@@ -13,6 +13,7 @@ import static io.zeebe.broker.system.configuration.ClusterCfg.DEFAULT_NODE_ID;
 import static io.zeebe.broker.system.configuration.ClusterCfg.DEFAULT_PARTITIONS_COUNT;
 import static io.zeebe.broker.system.configuration.ClusterCfg.DEFAULT_REPLICATION_FACTOR;
 import static io.zeebe.broker.system.configuration.DataCfg.DEFAULT_DIRECTORY;
+import static io.zeebe.broker.system.configuration.EnvironmentConstants.ENV_ADVERTISED_HOST;
 import static io.zeebe.broker.system.configuration.EnvironmentConstants.ENV_CLUSTER_NAME;
 import static io.zeebe.broker.system.configuration.EnvironmentConstants.ENV_CLUSTER_SIZE;
 import static io.zeebe.broker.system.configuration.EnvironmentConstants.ENV_DEBUG_EXPORTER;
@@ -24,6 +25,7 @@ import static io.zeebe.broker.system.configuration.EnvironmentConstants.ENV_NODE
 import static io.zeebe.broker.system.configuration.EnvironmentConstants.ENV_PARTITIONS_COUNT;
 import static io.zeebe.broker.system.configuration.EnvironmentConstants.ENV_PORT_OFFSET;
 import static io.zeebe.broker.system.configuration.EnvironmentConstants.ENV_REPLICATION_FACTOR;
+import static io.zeebe.broker.system.configuration.EnvironmentConstants.ENV_STEP_TIMEOUT;
 import static io.zeebe.broker.system.configuration.NetworkCfg.DEFAULT_COMMAND_API_PORT;
 import static io.zeebe.broker.system.configuration.NetworkCfg.DEFAULT_HOST;
 import static io.zeebe.broker.system.configuration.NetworkCfg.DEFAULT_INTERNAL_API_PORT;
@@ -56,12 +58,12 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-public class ConfigurationTest {
+public final class ConfigurationTest {
 
   public static final String BROKER_BASE = "test";
-  @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  @Rule public final TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  public Map<String, String> environment = new HashMap<>();
+  public final Map<String, String> environment = new HashMap<>();
 
   @Test
   public void shouldUseSpecifiedClusterName() {
@@ -72,6 +74,22 @@ public class ConfigurationTest {
   public void shouldUseClusterNameFromEnvironment() {
     environment.put(ENV_CLUSTER_NAME, "test-cluster");
     assertDefaultClusterName("test-cluster");
+  }
+
+  @Test
+  public void shouldUseDefaultStepTimeout() {
+    assertDefaultStepTimeout("5m");
+  }
+
+  @Test
+  public void shouldUseStepTimeout() {
+    assertStepTimeout("step-timeout-cfg", "2m");
+  }
+
+  @Test
+  public void shouldUseStepTimeoutFromEnv() {
+    environment.put(ENV_STEP_TIMEOUT, "1m");
+    assertDefaultStepTimeout("1m");
   }
 
   @Test
@@ -446,6 +464,37 @@ public class ConfigurationTest {
     assertThat(backpressure.getAlgorithm()).isEqualTo(LimitAlgorithm.GRADIENT);
   }
 
+  @Test
+  public void shouldUseDefaultAdvertisedHost() {
+    // when - then
+    assertAdvertisedAddress(
+        "default-advertised-host-cfg", "zeebe.io", NetworkCfg.DEFAULT_COMMAND_API_PORT);
+    assertHost("default-advertised-host-cfg", "0.0.0.0");
+  }
+
+  @Test
+  public void shouldUseAdvertisedHost() {
+    // when - then
+    assertAdvertisedAddress("advertised-host-cfg", "zeebe.io", NetworkCfg.DEFAULT_COMMAND_API_PORT);
+    assertHost("advertised-host-cfg", "0.0.0.0");
+  }
+
+  @Test
+  public void shouldUseAdvertisedAddress() {
+    // when - then
+    assertAdvertisedAddress("advertised-address-cfg", "zeebe.io", 8080);
+  }
+
+  @Test
+  public void shouldUseDefaultAdvertisedHostFromEnv() {
+    // given
+    environment.put(ENV_ADVERTISED_HOST, "zeebe.io");
+
+    // then
+    assertAdvertisedAddress("default", "zeebe.io", NetworkCfg.DEFAULT_COMMAND_API_PORT);
+    assertAdvertisedAddress("empty", "zeebe.io", NetworkCfg.DEFAULT_COMMAND_API_PORT);
+  }
+
   private BrokerCfg readConfig(final String name) {
     final String configPath = "/system/" + name + ".toml";
     final InputStream resourceAsStream = ConfigurationTest.class.getResourceAsStream(configPath);
@@ -468,7 +517,7 @@ public class ConfigurationTest {
     assertThat(cfg.getCluster().getNodeId()).isEqualTo(nodeId);
   }
 
-  private void assertDefaultClusterName(String clusterName) {
+  private void assertDefaultClusterName(final String clusterName) {
     assertClusterName("default", clusterName);
     assertClusterName("empty", clusterName);
   }
@@ -476,6 +525,16 @@ public class ConfigurationTest {
   private void assertClusterName(final String configFileName, final String clusterName) {
     final BrokerCfg cfg = readConfig(configFileName);
     assertThat(cfg.getCluster().getClusterName()).isEqualTo(clusterName);
+  }
+
+  private void assertDefaultStepTimeout(final String stepTimeout) {
+    assertStepTimeout("default", stepTimeout);
+    assertStepTimeout("empty", stepTimeout);
+  }
+
+  private void assertStepTimeout(final String configFileName, final String stepTimeout) {
+    final BrokerCfg cfg = readConfig(configFileName);
+    assertThat(cfg.getStepTimeout()).isEqualTo(stepTimeout);
   }
 
   private void assertDefaultPorts(final int command, final int internal, final int monitoring) {
@@ -487,7 +546,8 @@ public class ConfigurationTest {
       final String configFileName, final int command, final int internal, final int monitoring) {
     final BrokerCfg brokerCfg = readConfig(configFileName);
     final NetworkCfg network = brokerCfg.getNetwork();
-    assertThat(network.getCommandApi().getPort()).isEqualTo(command);
+    assertThat(network.getCommandApi().getAddress().port()).isEqualTo(command);
+    assertThat(network.getCommandApi().getAdvertisedAddress().port()).isEqualTo(command);
     assertThat(network.getInternalApi().getPort()).isEqualTo(internal);
     assertThat(network.getMonitoringApi().getPort()).isEqualTo(monitoring);
   }
@@ -512,9 +572,23 @@ public class ConfigurationTest {
     final NetworkCfg networkCfg = brokerCfg.getNetwork();
     assertThat(networkCfg.getHost()).isEqualTo(host);
     assertThat(brokerCfg.getGateway().getNetwork().getHost()).isEqualTo(gateway);
-    assertThat(networkCfg.getCommandApi().getHost()).isEqualTo(command);
+    assertThat(networkCfg.getCommandApi().getAddress().host()).isEqualTo(command);
     assertThat(networkCfg.getInternalApi().getHost()).isEqualTo(internal);
     assertThat(networkCfg.getMonitoringApi().getHost()).isEqualTo(monitoring);
+  }
+
+  private void assertAdvertisedHost(final String configFileName, final String host) {
+    final BrokerCfg brokerCfg = readConfig(configFileName);
+    final NetworkCfg networkCfg = brokerCfg.getNetwork();
+    assertThat(networkCfg.getCommandApi().getAdvertisedAddress().host()).isEqualTo(host);
+  }
+
+  private void assertAdvertisedAddress(
+      final String configFileName, final String host, final int port) {
+    final BrokerCfg brokerCfg = readConfig(configFileName);
+    final NetworkCfg networkCfg = brokerCfg.getNetwork();
+    assertThat(networkCfg.getCommandApi().getAdvertisedAddress().host()).isEqualTo(host);
+    assertThat(networkCfg.getCommandApi().getAdvertisedAddress().port()).isEqualTo(port);
   }
 
   private void assertDefaultContactPoints(final String... contactPoints) {
@@ -553,22 +627,22 @@ public class ConfigurationTest {
     assertThat(cfg.getDirectories()).containsExactlyElementsOf(expected);
   }
 
-  private void assertDefaultEmbeddedGatewayEnabled(boolean enabled) {
+  private void assertDefaultEmbeddedGatewayEnabled(final boolean enabled) {
     assertEmbeddedGatewayEnabled("default", enabled);
     assertEmbeddedGatewayEnabled("empty", enabled);
   }
 
-  private void assertEmbeddedGatewayEnabled(String configFileName, boolean enabled) {
+  private void assertEmbeddedGatewayEnabled(final String configFileName, final boolean enabled) {
     final EmbeddedGatewayCfg gatewayCfg = readConfig(configFileName).getGateway();
     assertThat(gatewayCfg.isEnable()).isEqualTo(enabled);
   }
 
-  private void assertDefaultDebugLogExporter(boolean prettyPrint) {
+  private void assertDefaultDebugLogExporter(final boolean prettyPrint) {
     assertDebugLogExporter("default", prettyPrint);
     assertDebugLogExporter("empty", prettyPrint);
   }
 
-  private void assertDebugLogExporter(String configFileName, boolean prettyPrint) {
+  private void assertDebugLogExporter(final String configFileName, final boolean prettyPrint) {
     final ExporterCfg exporterCfg = DebugLogExporter.defaultConfig(prettyPrint);
     final BrokerCfg brokerCfg = readConfig(configFileName);
 
@@ -578,11 +652,11 @@ public class ConfigurationTest {
   }
 
   private void assertDefaultSystemClusterConfiguration(
-      int nodeId,
-      int partitionsCount,
-      int replicationFactor,
-      int clusterSize,
-      List<String> initialContactPoints) {
+      final int nodeId,
+      final int partitionsCount,
+      final int replicationFactor,
+      final int clusterSize,
+      final List<String> initialContactPoints) {
     assertSystemClusterConfiguration(
         "default", nodeId, partitionsCount, replicationFactor, clusterSize, initialContactPoints);
     assertSystemClusterConfiguration(
@@ -590,12 +664,12 @@ public class ConfigurationTest {
   }
 
   private void assertSystemClusterConfiguration(
-      String configFileName,
-      int nodeId,
-      int partitionsCount,
-      int replicationFactor,
-      int clusterSize,
-      List<String> initialContactPoints) {
+      final String configFileName,
+      final int nodeId,
+      final int partitionsCount,
+      final int replicationFactor,
+      final int clusterSize,
+      final List<String> initialContactPoints) {
     final BrokerCfg cfg = readConfig(configFileName);
     final ClusterCfg cfgCluster = cfg.getCluster();
 

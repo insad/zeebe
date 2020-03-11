@@ -28,7 +28,7 @@ zeebe_stream_processor_events_total{action="skipped",partition="1",} 2153.0
 
 ## Configuring Metrics
 
-The HTTP server to export the metrics can be configured in the [configuration file](operations/the-zeebecfgtoml-file.html#Metrics).
+The HTTP server to export the metrics can be configured in the [configuration file](/operations/the-zeebecfgtoml-file.html#Metrics).
 
 ## Connecting Prometheus
 
@@ -54,7 +54,7 @@ Most metrics have the following common label:
 
 * `partition`: cluster-unique id of the partition
 
-The following metrics are collected:
+**Metrics related to workflow processing:**
 
 * `zeebe_stream_processor_events_total`: The number of events processed by the stream processor.
 The `action` label separates processed, skipped and written events. 
@@ -72,4 +72,24 @@ created, activated, timed out, completed, failed and canceled jobs.
 of created and resolved incident events.
 * `zeebe_pending_incidents_total`: The number of currently pending incident, i.e. not resolved.
 
+**Metrics related to performance:**
+
+Zeebe has a back-pressure mechanism by which it rejects requests, when it receives more requests than it can handle with out incurring high processing latency.
+The following metrics can be used to monitor back-pressure and processing latency of the commands.
+ 
+* `zeebe_dropped_request_count_total`: The number of user requests rejected by the broker due to backpressure.
+* `zeebe_backpressure_requests_limit`: The limit for the number of inflight requests used for backpressure.
+* `zeebe_stream_processor_latency_bucket`: The processing latency for commands and event.
+
 [prom-format]: https://prometheus.io/docs/instrumenting/exposition_formats/#text-format-details
+
+## Grafana
+
+Zeebe comes with a pre-built dashboard, available in the repository: 
+[monitor/grafana/zeebe.json](https://github.com/zeebe-io/zeebe/tree/{{commit}}/monitor/grafana/zeebe.json)
+
+[Import](https://grafana.com/docs/grafana/latest/reference/export_import/#importing-a-dashboard)
+it into your Grafana instance, then select the correct Prometheus data source (important if you have more than one), and
+you should be greeted with the following dashboard:
+
+![cluster](/operations/grafana-preview.png)

@@ -7,66 +7,59 @@
  */
 package io.zeebe.engine.processor;
 
-import static io.zeebe.engine.processor.StreamProcessorServiceNames.streamProcessorService;
-
 import io.zeebe.db.ZeebeDb;
-import io.zeebe.logstreams.impl.service.LogStreamServiceNames;
-import io.zeebe.logstreams.log.BufferedLogStreamReader;
 import io.zeebe.logstreams.log.LogStream;
 import io.zeebe.logstreams.log.LoggedEvent;
 import io.zeebe.protocol.Protocol;
 import io.zeebe.protocol.impl.record.RecordMetadata;
-import io.zeebe.servicecontainer.ServiceBuilder;
-import io.zeebe.servicecontainer.ServiceContainer;
-import io.zeebe.servicecontainer.ServiceName;
 import io.zeebe.util.sched.ActorScheduler;
-import io.zeebe.util.sched.future.ActorFuture;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
-public class StreamProcessorBuilder {
+public final class StreamProcessorBuilder {
 
   private final ProcessingContext processingContext;
-  private final List<ServiceName<?>> additionalDependencies = new ArrayList<>();
   private final List<StreamProcessorLifecycleAware> lifecycleListeners = new ArrayList<>();
   private TypedRecordProcessorFactory typedRecordProcessorFactory;
   private ActorScheduler actorScheduler;
-  private ServiceContainer serviceContainer;
   private ZeebeDb zeebeDb;
+  private int nodeId;
 
   public StreamProcessorBuilder() {
     processingContext = new ProcessingContext();
   }
 
   public StreamProcessorBuilder streamProcessorFactory(
-      TypedRecordProcessorFactory typedRecordProcessorFactory) {
+      final TypedRecordProcessorFactory typedRecordProcessorFactory) {
     this.typedRecordProcessorFactory = typedRecordProcessorFactory;
     return this;
   }
 
-  public StreamProcessorBuilder additionalDependencies(ServiceName<?> additionalDependencies) {
-    this.additionalDependencies.add(additionalDependencies);
-    return this;
-  }
-
-  public StreamProcessorBuilder actorScheduler(ActorScheduler actorScheduler) {
+  public StreamProcessorBuilder actorScheduler(final ActorScheduler actorScheduler) {
     this.actorScheduler = actorScheduler;
     return this;
   }
 
-  public StreamProcessorBuilder serviceContainer(ServiceContainer serviceContainer) {
-    this.serviceContainer = serviceContainer;
+  public StreamProcessorBuilder nodeId(int nodeId) {
+    this.nodeId = nodeId;
     return this;
   }
 
-  public StreamProcessorBuilder logStream(LogStream stream) {
+  public StreamProcessorBuilder logStream(final LogStream stream) {
     processingContext.logStream(stream);
     return this;
   }
 
-  public StreamProcessorBuilder commandResponseWriter(CommandResponseWriter commandResponseWriter) {
+  public StreamProcessorBuilder commandResponseWriter(
+      final CommandResponseWriter commandResponseWriter) {
     processingContext.commandResponseWriter(commandResponseWriter);
+    return this;
+  }
+
+  public StreamProcessorBuilder onProcessedListener(final Consumer<TypedRecord> onProcessed) {
+    processingContext.onProcessedListener(onProcessed);
     return this;
   }
 
@@ -87,10 +80,6 @@ public class StreamProcessorBuilder {
     return actorScheduler;
   }
 
-  public ServiceContainer getServiceContainer() {
-    return serviceContainer;
-  }
-
   public List<StreamProcessorLifecycleAware> getLifecycleListeners() {
     return lifecycleListeners;
   }
@@ -99,41 +88,23 @@ public class StreamProcessorBuilder {
     return zeebeDb;
   }
 
-  public ActorFuture<StreamProcessor> build() {
-    validate();
+  public int getNodeId() {
+    return nodeId;
+  }
 
-    final LogStream logStream = processingContext.getLogStream();
-    processingContext
-        .logStreamReader(new BufferedLogStreamReader(logStream))
-        .logStreamWriter(new TypedStreamWriterImpl(logStream));
+  public StreamProcessor build() {
+    validate();
 
     final MetadataFilter metadataFilter = new VersionFilter();
     final EventFilter eventFilter = new MetadataEventFilter(metadataFilter);
     processingContext.eventFilter(eventFilter);
 
-    final StreamProcessor streamProcessor = new StreamProcessor(this);
-
-    final String logName = logStream.getLogName();
-
-    final ServiceName<StreamProcessor> serviceName = streamProcessorService(logName);
-    final ServiceBuilder<StreamProcessor> serviceBuilder =
-        serviceContainer
-            .createService(serviceName, streamProcessor)
-            .dependency(LogStreamServiceNames.logStreamServiceName(logName))
-            .dependency(LogStreamServiceNames.logWriteBufferServiceName(logName))
-            .dependency(LogStreamServiceNames.logStorageServiceName(logName));
-
-    if (additionalDependencies != null) {
-      additionalDependencies.forEach((d) -> serviceBuilder.dependency(d));
-    }
-
-    return serviceBuilder.install();
+    return new StreamProcessor(this);
   }
 
   private void validate() {
     Objects.requireNonNull(typedRecordProcessorFactory, "No stream processor factory provided.");
     Objects.requireNonNull(actorScheduler, "No task scheduler provided.");
-    Objects.requireNonNull(serviceContainer, "No service container provided.");
     Objects.requireNonNull(processingContext.getLogStream(), "No log stream provided.");
     Objects.requireNonNull(
         processingContext.getCommandResponseWriter(), "No command response writer provided.");
@@ -145,12 +116,12 @@ public class StreamProcessorBuilder {
     protected final RecordMetadata metadata = new RecordMetadata();
     protected final MetadataFilter metadataFilter;
 
-    MetadataEventFilter(MetadataFilter metadataFilter) {
+    MetadataEventFilter(final MetadataFilter metadataFilter) {
       this.metadataFilter = metadataFilter;
     }
 
     @Override
-    public boolean applies(LoggedEvent event) {
+    public boolean applies(final LoggedEvent event) {
       event.readMetadata(metadata);
       return metadataFilter.applies(metadata);
     }
@@ -158,7 +129,7 @@ public class StreamProcessorBuilder {
 
   private final class VersionFilter implements MetadataFilter {
     @Override
-    public boolean applies(RecordMetadata m) {
+    public boolean applies(final RecordMetadata m) {
       if (m.getProtocolVersion() > Protocol.PROTOCOL_VERSION) {
         throw new RuntimeException(
             String.format(

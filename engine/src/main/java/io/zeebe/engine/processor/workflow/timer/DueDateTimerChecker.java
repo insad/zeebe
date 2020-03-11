@@ -9,7 +9,7 @@ package io.zeebe.engine.processor.workflow.timer;
 
 import io.zeebe.engine.processor.ReadonlyProcessingContext;
 import io.zeebe.engine.processor.StreamProcessorLifecycleAware;
-import io.zeebe.engine.processor.TypedStreamWriterImpl;
+import io.zeebe.engine.processor.TypedStreamWriter;
 import io.zeebe.engine.state.deployment.WorkflowState;
 import io.zeebe.engine.state.instance.TimerInstance;
 import io.zeebe.protocol.impl.record.value.timer.TimerRecord;
@@ -27,7 +27,7 @@ public class DueDateTimerChecker implements StreamProcessorLifecycleAware {
 
   private final WorkflowState workflowState;
   private ActorControl actor;
-  private TypedStreamWriterImpl streamWriter;
+  private TypedStreamWriter streamWriter;
 
   private ScheduledTimer scheduledTimer;
   private long nextDueDate = -1L;
@@ -77,7 +77,7 @@ public class DueDateTimerChecker implements StreamProcessorLifecycleAware {
     }
   }
 
-  private boolean triggerTimer(TimerInstance timer) {
+  private boolean triggerTimer(final TimerInstance timer) {
     timerRecord.reset();
     timerRecord
         .setElementInstanceKey(timer.getElementInstanceKey())
@@ -87,19 +87,16 @@ public class DueDateTimerChecker implements StreamProcessorLifecycleAware {
         .setRepetitions(timer.getRepetitions())
         .setWorkflowKey(timer.getWorkflowKey());
 
+    streamWriter.reset();
     streamWriter.appendFollowUpCommand(timer.getKey(), TimerIntent.TRIGGER, timerRecord);
 
     return streamWriter.flush() > 0;
   }
 
   @Override
-  public void onOpen(final ReadonlyProcessingContext processingContext) {
-    this.actor = processingContext.getActor();
-    streamWriter = new TypedStreamWriterImpl(processingContext.getLogStream());
-  }
-
-  @Override
   public void onRecovered(final ReadonlyProcessingContext processingContext) {
+    this.actor = processingContext.getActor();
+    streamWriter = processingContext.getLogStreamWriter();
     // check if timers are due after restart
     triggerTimers();
   }

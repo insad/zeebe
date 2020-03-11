@@ -10,6 +10,7 @@ package io.zeebe.engine.processor.workflow.deployment.model.transformer;
 import io.zeebe.engine.processor.workflow.deployment.model.BpmnStep;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableCatchEventElement;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableFlowElementContainer;
+import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableStartEvent;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableWorkflow;
 import io.zeebe.engine.processor.workflow.deployment.model.transformation.ModelElementTransformer;
 import io.zeebe.engine.processor.workflow.deployment.model.transformation.TransformContext;
@@ -17,7 +18,7 @@ import io.zeebe.model.bpmn.instance.FlowNode;
 import io.zeebe.model.bpmn.instance.StartEvent;
 import io.zeebe.protocol.record.intent.WorkflowInstanceIntent;
 
-public class StartEventTransformer implements ModelElementTransformer<StartEvent> {
+public final class StartEventTransformer implements ModelElementTransformer<StartEvent> {
 
   @Override
   public Class<StartEvent> getType() {
@@ -25,10 +26,12 @@ public class StartEventTransformer implements ModelElementTransformer<StartEvent
   }
 
   @Override
-  public void transform(StartEvent element, TransformContext context) {
+  public void transform(final StartEvent element, final TransformContext context) {
     final ExecutableWorkflow workflow = context.getCurrentWorkflow();
-    final ExecutableCatchEventElement startEvent =
-        workflow.getElementById(element.getId(), ExecutableCatchEventElement.class);
+    final ExecutableStartEvent startEvent =
+        workflow.getElementById(element.getId(), ExecutableStartEvent.class);
+
+    startEvent.setInterrupting(element.isInterrupting());
 
     if (element.getScope() instanceof FlowNode) {
       final FlowNode scope = (FlowNode) element.getScope();

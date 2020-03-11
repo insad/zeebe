@@ -55,7 +55,7 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
-public class JsonSerializableToJsonTest {
+public final class JsonSerializableToJsonTest {
 
   private static final String VARIABLES_JSON = "{'foo':'bar'}";
   private static final DirectBuffer VARIABLES_MSGPACK =
@@ -284,6 +284,7 @@ public class JsonSerializableToJsonTest {
                   .setVariables(VARIABLES_MSGPACK)
                   .setRetries(3)
                   .setErrorMessage("failed message")
+                  .setErrorCode(wrapString("error"))
                   .setDeadline(1000L)
                   .setBpmnProcessId(wrapString(bpmnProcessId))
                   .setWorkflowKey(workflowKey)
@@ -294,7 +295,7 @@ public class JsonSerializableToJsonTest {
 
               return record;
             },
-        "{'maxJobsToActivate':1,'type':'type','worker':'worker','truncated':true,'jobKeys':[3],'jobs':[{'bpmnProcessId':'test-process','workflowKey':13,'workflowDefinitionVersion':12,'workflowInstanceKey':1234,'elementId':'activity','elementInstanceKey':123,'type':'type','worker':'worker','variables':{'foo':'bar'},'retries':3,'errorMessage':'failed message','customHeaders':{},'deadline':1000}],'timeout':2}"
+        "{'maxJobsToActivate':1,'type':'type','worker':'worker','truncated':true,'jobKeys':[3],'jobs':[{'bpmnProcessId':'test-process','workflowKey':13,'workflowDefinitionVersion':12,'workflowInstanceKey':1234,'elementId':'activity','elementInstanceKey':123,'type':'type','worker':'worker','variables':{'foo':'bar'},'retries':3,'errorMessage':'failed message','errorCode':'error','customHeaders':{},'deadline':1000}],'timeout':2}"
       },
       /////////////////////////////////////////////////////////////////////////////////////////////
       ///////////////////////////////// Empty JobBatchRecord //////////////////////////////////////
@@ -338,6 +339,7 @@ public class JsonSerializableToJsonTest {
                       .setRetries(retries)
                       .setDeadline(deadline)
                       .setErrorMessage("failed message")
+                      .setErrorCode(wrapString("error"))
                       .setBpmnProcessId(wrapString(bpmnProcessId))
                       .setWorkflowKey(workflowKey)
                       .setWorkflowDefinitionVersion(workflowDefinitionVersion)
@@ -348,7 +350,7 @@ public class JsonSerializableToJsonTest {
               record.setCustomHeaders(wrapArray(MsgPackConverter.convertToMsgPack(customHeaders)));
               return record;
             },
-        "{'bpmnProcessId':'test-process','workflowKey':13,'workflowDefinitionVersion':12,'workflowInstanceKey':1234,'elementId':'activity','elementInstanceKey':123,'worker':'myWorker','type':'myType','variables':{'foo':'bar'},'retries':12,'errorMessage':'failed message','customHeaders':{'workerVersion':'42'},'deadline':13}"
+        "{'bpmnProcessId':'test-process','workflowKey':13,'workflowDefinitionVersion':12,'workflowInstanceKey':1234,'elementId':'activity','elementInstanceKey':123,'worker':'myWorker','type':'myType','variables':{'foo':'bar'},'retries':12,'errorMessage':'failed message','errorCode':'error','customHeaders':{'workerVersion':'42'},'deadline':13}"
       },
 
       /////////////////////////////////////////////////////////////////////////////////////////////
@@ -357,7 +359,7 @@ public class JsonSerializableToJsonTest {
       {
         "Empty JobRecord",
         (Supplier<UnifiedRecordValue>) JobRecord::new,
-        "{'type':'','workflowDefinitionVersion':-1,'elementId':'','bpmnProcessId':'','workflowKey':-1,'workflowInstanceKey':-1,'elementInstanceKey':-1,'variables':{},'worker':'','retries':-1,'errorMessage':'','customHeaders':{},'deadline':-1}"
+        "{'type':'','workflowDefinitionVersion':-1,'elementId':'','bpmnProcessId':'','workflowKey':-1,'workflowInstanceKey':-1,'elementInstanceKey':-1,'variables':{},'worker':'','retries':-1,'errorMessage':'','errorCode':'','customHeaders':{},'deadline':-1}"
       },
       /////////////////////////////////////////////////////////////////////////////////////////////
       ///////////////////////////////// MessageRecord /////////////////////////////////////////////
@@ -409,13 +411,15 @@ public class JsonSerializableToJsonTest {
               final String messageName = "name";
               final String startEventId = "startEvent";
               final int workflowKey = 22334;
+              final String bpmnProcessId = "workflow";
 
               return new MessageStartEventSubscriptionRecord()
                   .setMessageName(wrapString(messageName))
                   .setStartEventId(wrapString(startEventId))
-                  .setWorkflowKey(workflowKey);
+                  .setWorkflowKey(workflowKey)
+                  .setBpmnProcessId(wrapString(bpmnProcessId));
             },
-        "{'workflowKey':22334,'messageName':'name','startEventId':'startEvent'}"
+        "{'workflowKey':22334,'messageName':'name','startEventId':'startEvent','bpmnProcessId':'workflow'}"
       },
 
       /////////////////////////////////////////////////////////////////////////////////////////////
@@ -429,7 +433,7 @@ public class JsonSerializableToJsonTest {
 
               return new MessageStartEventSubscriptionRecord().setWorkflowKey(workflowKey);
             },
-        "{'workflowKey':22334,'messageName':'','startEventId':''}"
+        "{'workflowKey':22334,'messageName':'','startEventId':'','bpmnProcessId':''}"
       },
 
       /////////////////////////////////////////////////////////////////////////////////////////////
@@ -439,20 +443,22 @@ public class JsonSerializableToJsonTest {
         "MessageSubscriptionRecord",
         (Supplier<UnifiedRecordValue>)
             () -> {
-              final long activityInstanceKey = 1L;
+              final long elementInstanceKey = 1L;
+              final String bpmnProcessId = "workflow";
               final String messageName = "name";
-              final long workflowInstanceKey = 1L;
+              final long workflowInstanceKey = 2L;
               final String correlationKey = "key";
-              final long messageKey = 1L;
+              final long messageKey = 3L;
 
               return new MessageSubscriptionRecord()
-                  .setElementInstanceKey(activityInstanceKey)
+                  .setElementInstanceKey(elementInstanceKey)
+                  .setBpmnProcessId(wrapString(bpmnProcessId))
                   .setMessageKey(messageKey)
                   .setMessageName(wrapString(messageName))
                   .setWorkflowInstanceKey(workflowInstanceKey)
                   .setCorrelationKey(wrapString(correlationKey));
             },
-        "{'workflowInstanceKey':1,'elementInstanceKey':1,'messageName':'name','correlationKey':'key'}"
+        "{'workflowInstanceKey':2,'elementInstanceKey':1,'messageName':'name','correlationKey':'key','bpmnProcessId':'workflow','messageKey':3}"
       },
       /////////////////////////////////////////////////////////////////////////////////////////////
       ///////////////////////////////// Empty MessageSubscriptionRecord
@@ -469,7 +475,7 @@ public class JsonSerializableToJsonTest {
                   .setWorkflowInstanceKey(workflowInstanceKey)
                   .setElementInstanceKey(elementInstanceKey);
             },
-        "{'workflowInstanceKey':1,'elementInstanceKey':13,'messageName':'','correlationKey':''}"
+        "{'workflowInstanceKey':1,'elementInstanceKey':13,'messageName':'','correlationKey':'','bpmnProcessId':'','messageKey':-1}"
       },
 
       /////////////////////////////////////////////////////////////////////////////////////////////
@@ -479,21 +485,25 @@ public class JsonSerializableToJsonTest {
         "WorkflowInstanceSubscriptionRecord",
         (Supplier<UnifiedRecordValue>)
             () -> {
-              final long activityInstanceKey = 123;
+              final long elementInstanceKey = 123;
+              final String bpmnProcessId = "workflow";
               final String messageName = "test-message";
               final int subscriptionPartitionId = 2;
               final int messageKey = 3;
               final long workflowInstanceKey = 1345;
+              final String correlationKey = "key";
 
               return new WorkflowInstanceSubscriptionRecord()
-                  .setElementInstanceKey(activityInstanceKey)
+                  .setElementInstanceKey(elementInstanceKey)
+                  .setBpmnProcessId(wrapString(bpmnProcessId))
                   .setMessageName(wrapString(messageName))
                   .setMessageKey(messageKey)
                   .setSubscriptionPartitionId(subscriptionPartitionId)
                   .setWorkflowInstanceKey(workflowInstanceKey)
-                  .setVariables(VARIABLES_MSGPACK);
+                  .setVariables(VARIABLES_MSGPACK)
+                  .setCorrelationKey(wrapString(correlationKey));
             },
-        "{'elementInstanceKey':123,'messageName':'test-message','workflowInstanceKey':1345,'variables':{'foo':'bar'}}"
+        "{'elementInstanceKey':123,'messageName':'test-message','workflowInstanceKey':1345,'variables':{'foo':'bar'},'bpmnProcessId':'workflow','messageKey':3,'correlationKey':'key'}"
       },
 
       /////////////////////////////////////////////////////////////////////////////////////////////
@@ -510,7 +520,7 @@ public class JsonSerializableToJsonTest {
                   .setWorkflowInstanceKey(workflowInstanceKey)
                   .setElementInstanceKey(elementInstanceKey);
             },
-        "{'elementInstanceKey':123,'messageName':'','workflowInstanceKey':1345,'variables':{}}"
+        "{'elementInstanceKey':123,'messageName':'','workflowInstanceKey':1345,'variables':{},'bpmnProcessId':'','messageKey':-1,'correlationKey':''}"
       },
 
       /////////////////////////////////////////////////////////////////////////////////////////////
@@ -648,9 +658,11 @@ public class JsonSerializableToJsonTest {
                   .setVersion(version)
                   .setWorkflowKey(workflowKey)
                   .setWorkflowInstanceKey(workflowInstanceKey)
-                  .setFlowScopeKey(flowScopeKey);
+                  .setFlowScopeKey(flowScopeKey)
+                  .setParentWorkflowInstanceKey(11)
+                  .setParentElementInstanceKey(22);
             },
-        "{'bpmnProcessId':'test-process','version':12,'workflowKey':13,'workflowInstanceKey':1234,'elementId':'activity','flowScopeKey':123,'bpmnElementType':'SERVICE_TASK'}"
+        "{'bpmnProcessId':'test-process','version':12,'workflowKey':13,'workflowInstanceKey':1234,'elementId':'activity','flowScopeKey':123,'bpmnElementType':'SERVICE_TASK','parentWorkflowInstanceKey':11,'parentElementInstanceKey':22}"
       },
 
       /////////////////////////////////////////////////////////////////////////////////////////////
@@ -659,7 +671,7 @@ public class JsonSerializableToJsonTest {
       {
         "Empty WorkflowInstanceRecord",
         (Supplier<UnifiedRecordValue>) WorkflowInstanceRecord::new,
-        "{'bpmnProcessId':'','version':-1,'workflowKey':-1,'workflowInstanceKey':-1,'elementId':'','flowScopeKey':-1,'bpmnElementType':'UNSPECIFIED'}"
+        "{'bpmnProcessId':'','version':-1,'workflowKey':-1,'workflowInstanceKey':-1,'elementId':'','flowScopeKey':-1,'bpmnElementType':'UNSPECIFIED','parentWorkflowInstanceKey':-1,'parentElementInstanceKey':-1}"
       },
     };
   }
@@ -675,7 +687,7 @@ public class JsonSerializableToJsonTest {
     JsonUtil.assertEquality(json, expectedJson);
   }
 
-  private static String errorRecordAsJson(long workflowInstanceKey, String stacktrace) {
+  private static String errorRecordAsJson(final long workflowInstanceKey, final String stacktrace) {
     final Map<String, Object> params = new HashMap<>();
     params.put("exceptionMessage", "test");
     params.put("workflowInstanceKey", workflowInstanceKey);
@@ -684,7 +696,7 @@ public class JsonSerializableToJsonTest {
 
     try {
       return new ObjectMapper().writeValueAsString(params);
-    } catch (JsonProcessingException e) {
+    } catch (final JsonProcessingException e) {
       throw new RuntimeException(e);
     }
   }

@@ -21,9 +21,9 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class WorkflowInstanceSubscriptionStateTest {
+public final class WorkflowInstanceSubscriptionStateTest {
 
-  @Rule public ZeebeStateRule stateRule = new ZeebeStateRule();
+  @Rule public final ZeebeStateRule stateRule = new ZeebeStateRule();
 
   private WorkflowInstanceSubscriptionState state;
 
@@ -271,20 +271,25 @@ public class WorkflowInstanceSubscriptionStateTest {
             new Tuple<>(1L, wrapString("message1")), new Tuple<>(1L, wrapString("message2")));
   }
 
-  private WorkflowInstanceSubscription subscriptionWithElementInstanceKey(long elementInstanceKey) {
+  private WorkflowInstanceSubscription subscriptionWithElementInstanceKey(
+      final long elementInstanceKey) {
     return subscription("handler", "messageName", "correlationKey", elementInstanceKey);
   }
 
   private WorkflowInstanceSubscription subscription(
-      String name, String correlationKey, long elementInstanceKey) {
+      final String name, final String correlationKey, final long elementInstanceKey) {
     return subscription("handler", name, correlationKey, elementInstanceKey);
   }
 
   private WorkflowInstanceSubscription subscription(
-      String handlerId, String name, String correlationKey, long elementInstanceKey) {
+      final String handlerId,
+      final String name,
+      final String correlationKey,
+      final long elementInstanceKey) {
     return new WorkflowInstanceSubscription(
         1L,
         elementInstanceKey,
+        wrapString("workflow"),
         wrapString(handlerId),
         wrapString(name),
         wrapString(correlationKey),

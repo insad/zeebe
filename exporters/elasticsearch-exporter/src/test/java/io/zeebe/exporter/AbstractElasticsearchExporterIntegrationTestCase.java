@@ -12,9 +12,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.carrotsearch.hppc.cursors.ObjectCursor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.zeebe.exporter.util.ElasticsearchForkedJvm;
+import io.zeebe.exporter.util.ElasticsearchContainer;
 import io.zeebe.exporter.util.ElasticsearchNode;
 import io.zeebe.protocol.record.Record;
+import io.zeebe.protocol.record.ValueType;
 import io.zeebe.test.exporter.ExporterIntegrationRule;
 import io.zeebe.test.util.record.RecordingExporterTestWatcher;
 import io.zeebe.util.ZbLogger;
@@ -43,13 +44,13 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
 
   protected final ExporterIntegrationRule exporterBrokerRule = new ExporterIntegrationRule();
 
-  protected ElasticsearchNode<ElasticsearchForkedJvm> elastic;
+  protected ElasticsearchNode<ElasticsearchContainer> elastic;
   protected ElasticsearchExporterConfiguration configuration;
   protected ElasticsearchExporterFaultToleranceIT.ElasticsearchTestClient esClient;
 
   @Before
   public void setUp() {
-    elastic = new ElasticsearchForkedJvm(temporaryFolder);
+    elastic = new ElasticsearchContainer();
   }
 
   @After
@@ -66,24 +67,28 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
 
   protected void assertIndexSettings() {
     final ImmutableOpenMap<String, Settings> settingsForIndices = esClient.getSettingsForIndices();
-    for (ObjectCursor<String> key : settingsForIndices.keys()) {
-      final Settings settings = settingsForIndices.get(key.value);
+    for (final ObjectCursor<String> key : settingsForIndices.keys()) {
+      final String indexName = key.value;
+      final Settings settings = settingsForIndices.get(indexName);
       final Integer numberOfShards = settings.getAsInt("index.number_of_shards", -1);
       final Integer numberOfReplicas = settings.getAsInt("index.number_of_replicas", -1);
 
+      final int expectedNumberOfShards = numberOfShardsForIndex(indexName);
+
       assertThat(numberOfShards)
           .withFailMessage(
-              "Expected number of shards of index %s to be 1 but was %d", key.value, numberOfShards)
-          .isEqualTo(1);
+              "Expected number of shards of index %s to be %d but was %d",
+              indexName, expectedNumberOfShards, numberOfShards)
+          .isEqualTo(expectedNumberOfShards);
       assertThat(numberOfReplicas)
           .withFailMessage(
               "Expected number of replicas of index %s to be 0 but was %d",
-              key.value, numberOfReplicas)
+              indexName, numberOfReplicas)
           .isEqualTo(0);
     }
   }
 
-  protected void assertRecordExported(Record<?> record) {
+  protected void assertRecordExported(final Record<?> record) {
     final Map<String, Object> source = esClient.get(record);
     assertThat(source)
         .withFailMessage("Failed to fetch record %s from elasticsearch", record)
@@ -93,7 +98,7 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
   }
 
   protected ElasticsearchTestClient createElasticsearchClient(
-      ElasticsearchExporterConfiguration configuration) {
+      final ElasticsearchExporterConfiguration configuration) {
     return new ElasticsearchTestClient(
         configuration, new ZbLogger("io.zeebe.exporter.elasticsearch"));
   }
@@ -102,11 +107,21 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
     final JsonNode jsonNode;
     try {
       jsonNode = MAPPER.readTree(record.toJson());
-    } catch (IOException e) {
+    } catch (final IOException e) {
       throw new AssertionError("Failed to deserialize json of record " + record.toJson(), e);
     }
 
     return MAPPER.convertValue(jsonNode, Map.class);
+  }
+
+  private int numberOfShardsForIndex(final String indexName) {
+    if (indexName.startsWith(
+            esClient.indexPrefixForValueTypeWithDelimiter(ValueType.WORKFLOW_INSTANCE))
+        || indexName.startsWith(esClient.indexPrefixForValueTypeWithDelimiter(ValueType.JOB))) {
+      return 3;
+    } else {
+      return 1;
+    }
   }
 
   protected ElasticsearchExporterConfiguration getDefaultConfiguration() {
@@ -141,7 +156,8 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
 
   protected static class ElasticsearchTestClient extends ElasticsearchClient {
 
-    ElasticsearchTestClient(ElasticsearchExporterConfiguration configuration, Logger log) {
+    ElasticsearchTestClient(
+        final ElasticsearchExporterConfiguration configuration, final Logger log) {
       super(configuration, log);
     }
 
@@ -152,13 +168,15 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
             .indices()
             .getSettings(settingsRequest, RequestOptions.DEFAULT)
             .getIndexToSettings();
-      } catch (IOException e) {
+      } catch (final IOException e) {
         throw new ElasticsearchExporterException("Failed to get index settings", e);
       }
     }
 
-    Map<String, Object> get(Record<?> record) {
-      final GetRequest request = new GetRequest(indexFor(record), typeFor(record), idFor(record));
+    Map<String, Object> get(final Record<?> record) {
+      final GetRequest request =
+          new GetRequest(indexFor(record), typeFor(record), idFor(record))
+              .routing(String.valueOf(record.getPartitionId()));
       try {
         final GetResponse response = client.get(request, RequestOptions.DEFAULT);
         if (response.isExists()) {
@@ -166,7 +184,7 @@ public abstract class AbstractElasticsearchExporterIntegrationTestCase {
         } else {
           return null;
         }
-      } catch (IOException e) {
+      } catch (final IOException e) {
         throw new ElasticsearchExporterException(
             "Failed to get record " + idFor(record) + " from index " + indexFor(record));
       }

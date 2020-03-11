@@ -17,7 +17,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.zeebe.engine.processor.CopiedRecords;
-import io.zeebe.engine.processor.ReadonlyProcessingContext;
 import io.zeebe.engine.processor.StreamProcessorLifecycleAware;
 import io.zeebe.engine.processor.workflow.job.JobEventProcessors;
 import io.zeebe.engine.processor.workflow.message.command.SubscriptionCommandSender;
@@ -59,7 +58,7 @@ import org.junit.Rule;
 import org.junit.rules.ExternalResource;
 import org.junit.rules.TemporaryFolder;
 
-public class WorkflowInstanceStreamProcessorRule extends ExternalResource
+public final class WorkflowInstanceStreamProcessorRule extends ExternalResource
     implements StreamProcessorLifecycleAware {
 
   public static final int VERSION = 1;
@@ -72,7 +71,7 @@ public class WorkflowInstanceStreamProcessorRule extends ExternalResource
   private WorkflowState workflowState;
   private ActorControl actor;
 
-  public WorkflowInstanceStreamProcessorRule(StreamProcessorRule streamProcessorRule) {
+  public WorkflowInstanceStreamProcessorRule(final StreamProcessorRule streamProcessorRule) {
     environmentRule = streamProcessorRule;
   }
 
@@ -85,20 +84,22 @@ public class WorkflowInstanceStreamProcessorRule extends ExternalResource
     mockSubscriptionCommandSender = mock(SubscriptionCommandSender.class);
 
     when(mockSubscriptionCommandSender.openMessageSubscription(
-            anyInt(), anyLong(), anyLong(), any(), any(), anyBoolean()))
+            anyInt(), anyLong(), anyLong(), any(), any(), any(), anyBoolean()))
         .thenReturn(true);
     when(mockSubscriptionCommandSender.correlateMessageSubscription(
-            anyInt(), anyLong(), anyLong(), any()))
+            anyInt(), anyLong(), anyLong(), any(), any()))
         .thenReturn(true);
     when(mockSubscriptionCommandSender.closeMessageSubscription(
             anyInt(), anyLong(), anyLong(), any(DirectBuffer.class)))
         .thenReturn(true);
     when(mockSubscriptionCommandSender.rejectCorrelateMessageSubscription(
-            anyLong(), anyLong(), anyLong(), any(), any()))
+            anyLong(), any(), anyLong(), any(), any()))
         .thenReturn(true);
 
     environmentRule.startTypedStreamProcessor(
-        (typedRecordProcessors, zeebeState) -> {
+        (typedRecordProcessors, processingContext) -> {
+          final var zeebeState = processingContext.getZeebeState();
+          actor = processingContext.getActor();
           workflowState = zeebeState.getWorkflowState();
           WorkflowEventProcessors.addWorkflowProcessors(
               zeebeState,
@@ -114,7 +115,8 @@ public class WorkflowInstanceStreamProcessorRule extends ExternalResource
         });
   }
 
-  public void deploy(final BpmnModelInstance modelInstance, int deploymentKey, int version) {
+  public void deploy(
+      final BpmnModelInstance modelInstance, final int deploymentKey, final int version) {
     final ByteArrayOutputStream outStream = new ByteArrayOutputStream();
     Bpmn.writeModelToStream(outStream, modelInstance);
     final DirectBuffer xmlBuffer = new UnsafeBuffer(outStream.toByteArray());
@@ -147,7 +149,7 @@ public class WorkflowInstanceStreamProcessorRule extends ExternalResource
   }
 
   public Record<WorkflowInstanceRecord> createAndReceiveWorkflowInstance(
-      Function<WorkflowInstanceCreationRecord, WorkflowInstanceCreationRecord> transformer) {
+      final Function<WorkflowInstanceCreationRecord, WorkflowInstanceCreationRecord> transformer) {
     final Record<WorkflowInstanceCreationRecord> createdRecord =
         createWorkflowInstance(transformer);
 
@@ -158,7 +160,7 @@ public class WorkflowInstanceStreamProcessorRule extends ExternalResource
   }
 
   public Record<WorkflowInstanceCreationRecord> createWorkflowInstance(
-      Function<WorkflowInstanceCreationRecord, WorkflowInstanceCreationRecord> transformer) {
+      final Function<WorkflowInstanceCreationRecord, WorkflowInstanceCreationRecord> transformer) {
     final long position =
         environmentRule.writeCommand(
             WorkflowInstanceCreationIntent.CREATE,
@@ -180,13 +182,13 @@ public class WorkflowInstanceStreamProcessorRule extends ExternalResource
   }
 
   public Record<WorkflowInstanceRecord> awaitAndGetFirstWorkflowInstanceRecord(
-      Predicate<Record<WorkflowInstanceRecord>> matcher) {
+      final Predicate<Record<WorkflowInstanceRecord>> matcher) {
     return awaitAndGetFirstRecord(
         ValueType.WORKFLOW_INSTANCE, matcher, WorkflowInstanceRecord.class);
   }
 
   public <T extends UnifiedRecordValue> Record<T> awaitAndGetFirstRecord(
-      ValueType valueType, Predicate<Record<T>> matcher, Class<T> valueClass) {
+      final ValueType valueType, final Predicate<Record<T>> matcher, final Class<T> valueClass) {
     return TestUtil.doRepeatedly(
             () ->
                 environmentRule
@@ -203,7 +205,7 @@ public class WorkflowInstanceStreamProcessorRule extends ExternalResource
   }
 
   public <T extends UnifiedRecordValue> Record<T> awaitAndGetFirstRecord(
-      ValueType valueType, Function<Record<T>, Boolean> matcher, T value) {
+      final ValueType valueType, final Function<Record<T>, Boolean> matcher, final T value) {
     return TestUtil.doRepeatedly(
             () ->
                 environmentRule
@@ -287,16 +289,6 @@ public class WorkflowInstanceStreamProcessorRule extends ExternalResource
 
     waitUntil(() -> lookupStream.get().findFirst().isPresent());
     return lookupStream.get().findFirst().get();
-  }
-
-  @Override
-  public void onOpen(ReadonlyProcessingContext processingContext) {
-    actor = processingContext.getActor();
-  }
-
-  @Override
-  public void onRecovered(ReadonlyProcessingContext processingContext) {
-    // recovered
   }
 
   @Override

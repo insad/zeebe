@@ -35,7 +35,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-public class CredentialsTest {
+public final class CredentialsTest {
   private static final Key<String> AUTH_KEY =
       Key.of("Authorization", Metadata.ASCII_STRING_MARSHALLER);
 
@@ -73,12 +73,12 @@ public class CredentialsTest {
         .credentialsProvider(
             new CredentialsProvider() {
               @Override
-              public void applyCredentials(Metadata headers) {
+              public void applyCredentials(final Metadata headers) {
                 headers.put(AUTH_KEY, bearerToken);
               }
 
               @Override
-              public boolean shouldRetryRequest(Throwable throwable) {
+              public boolean shouldRetryRequest(final Throwable throwable) {
                 return false;
               }
             });
@@ -98,8 +98,8 @@ public class CredentialsTest {
 
     recordingInterceptor.setInterceptAction(
         (call, headers) -> {
-          call.close(Status.UNKNOWN, headers);
           recordingInterceptor.reset();
+          call.close(Status.UNKNOWN, headers);
         });
 
     final CredentialsProvider provider =
@@ -108,12 +108,12 @@ public class CredentialsTest {
               int attempt = 0;
 
               @Override
-              public void applyCredentials(Metadata headers) {
+              public void applyCredentials(final Metadata headers) {
                 headers.put(AUTH_KEY, String.format("Bearer token-%d", attempt++));
               }
 
               @Override
-              public boolean shouldRetryRequest(Throwable throwable) {
+              public boolean shouldRetryRequest(final Throwable throwable) {
                 return true;
               }
             });
@@ -134,10 +134,7 @@ public class CredentialsTest {
     final int retries = 2;
     final ZeebeClientBuilderImpl builder = new ZeebeClientBuilderImpl();
 
-    recordingInterceptor.setInterceptAction(
-        (call, headers) -> {
-          call.close(Status.UNKNOWN, headers);
-        });
+    recordingInterceptor.setInterceptAction((call, headers) -> call.close(Status.UNKNOWN, headers));
 
     final CredentialsProvider provider =
         Mockito.spy(
@@ -145,12 +142,12 @@ public class CredentialsTest {
               int retryCounter = retries;
 
               @Override
-              public void applyCredentials(Metadata headers) {
+              public void applyCredentials(final Metadata headers) {
                 headers.put(AUTH_KEY, String.format("Bearer token-%d", retryCounter));
               }
 
               @Override
-              public boolean shouldRetryRequest(Throwable throwable) {
+              public boolean shouldRetryRequest(final Throwable throwable) {
                 return retryCounter-- > 0;
               }
             });

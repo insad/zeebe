@@ -9,10 +9,8 @@ package io.zeebe.engine.processor;
 
 import static io.zeebe.engine.processor.TypedEventRegistry.EVENT_REGISTRY;
 
-import io.zeebe.logstreams.log.LogStream;
 import io.zeebe.logstreams.log.LogStreamBatchWriter;
 import io.zeebe.logstreams.log.LogStreamBatchWriter.LogEntryBuilder;
-import io.zeebe.logstreams.log.LogStreamBatchWriterImpl;
 import io.zeebe.msgpack.UnpackedObject;
 import io.zeebe.protocol.Protocol;
 import io.zeebe.protocol.impl.record.RecordMetadata;
@@ -27,16 +25,15 @@ import java.util.function.Consumer;
 public class TypedCommandWriterImpl implements TypedCommandWriter {
   protected final Consumer<RecordMetadata> noop = m -> {};
   protected final Map<Class<? extends UnpackedObject>, ValueType> typeRegistry;
-  protected final LogStream stream;
-  protected RecordMetadata metadata = new RecordMetadata();
-  protected LogStreamBatchWriter batchWriter;
+  protected final RecordMetadata metadata = new RecordMetadata();
+  protected final LogStreamBatchWriter batchWriter;
 
   protected long sourceRecordPosition = -1;
+  private boolean disabled = false;
 
-  public TypedCommandWriterImpl(final LogStream stream) {
-    this.stream = stream;
+  public TypedCommandWriterImpl(final LogStreamBatchWriter batchWriter) {
     metadata.protocolVersion(Protocol.PROTOCOL_VERSION);
-    this.batchWriter = new LogStreamBatchWriterImpl(stream);
+    this.batchWriter = batchWriter;
     this.typeRegistry = new HashMap<>();
     EVENT_REGISTRY.forEach((e, c) -> typeRegistry.put(c, e));
   }
@@ -74,6 +71,7 @@ public class TypedCommandWriterImpl implements TypedCommandWriter {
       final String rejectionReason,
       final UnpackedObject value,
       final Consumer<RecordMetadata> additionalMetadata) {
+
     final LogEntryBuilder event = batchWriter.event();
 
     if (sourceRecordPosition >= 0) {
@@ -122,5 +120,10 @@ public class TypedCommandWriterImpl implements TypedCommandWriter {
   @Override
   public long flush() {
     return batchWriter.tryWrite();
+  }
+
+  @Override
+  public void close() {
+    batchWriter.close();
   }
 }

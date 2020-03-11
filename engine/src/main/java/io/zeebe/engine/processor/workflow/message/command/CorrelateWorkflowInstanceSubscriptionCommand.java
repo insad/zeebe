@@ -12,7 +12,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
-public class CorrelateWorkflowInstanceSubscriptionCommand
+public final class CorrelateWorkflowInstanceSubscriptionCommand
     extends SbeBufferWriterReader<
         CorrelateWorkflowInstanceSubscriptionEncoder,
         CorrelateWorkflowInstanceSubscriptionDecoder> {
@@ -23,6 +23,8 @@ public class CorrelateWorkflowInstanceSubscriptionCommand
       new CorrelateWorkflowInstanceSubscriptionDecoder();
   private final UnsafeBuffer messageName = new UnsafeBuffer(0, 0);
   private final UnsafeBuffer variables = new UnsafeBuffer(0, 0);
+  private final UnsafeBuffer bpmnProcessId = new UnsafeBuffer(0, 0);
+  private final UnsafeBuffer correlationKey = new UnsafeBuffer(0, 0);
   private int subscriptionPartitionId;
   private long workflowInstanceKey;
   private long elementInstanceKey;
@@ -49,6 +51,8 @@ public class CorrelateWorkflowInstanceSubscriptionCommand
 
     messageName.wrap(0, 0);
     variables.wrap(0, 0);
+    bpmnProcessId.wrap(0, 0);
+    correlationKey.wrap(0, 0);
   }
 
   @Override
@@ -57,11 +61,15 @@ public class CorrelateWorkflowInstanceSubscriptionCommand
         + CorrelateWorkflowInstanceSubscriptionDecoder.messageNameHeaderLength()
         + messageName.capacity()
         + CorrelateWorkflowInstanceSubscriptionDecoder.variablesHeaderLength()
-        + variables.capacity();
+        + variables.capacity()
+        + CorrelateWorkflowInstanceSubscriptionDecoder.bpmnProcessIdHeaderLength()
+        + bpmnProcessId.capacity()
+        + CorrelateWorkflowInstanceSubscriptionDecoder.correlationKeyHeaderLength()
+        + correlationKey.capacity();
   }
 
   @Override
-  public void write(MutableDirectBuffer buffer, int offset) {
+  public void write(final MutableDirectBuffer buffer, final int offset) {
     super.write(buffer, offset);
 
     encoder
@@ -70,11 +78,13 @@ public class CorrelateWorkflowInstanceSubscriptionCommand
         .elementInstanceKey(elementInstanceKey)
         .messageKey(messageKey)
         .putMessageName(messageName, 0, messageName.capacity())
-        .putVariables(variables, 0, variables.capacity());
+        .putVariables(variables, 0, variables.capacity())
+        .putBpmnProcessId(bpmnProcessId, 0, bpmnProcessId.capacity())
+        .putCorrelationKey(correlationKey, 0, correlationKey.capacity());
   }
 
   @Override
-  public void wrap(DirectBuffer buffer, int offset, int length) {
+  public void wrap(final DirectBuffer buffer, int offset, final int length) {
     super.wrap(buffer, offset, length);
 
     subscriptionPartitionId = decoder.subscriptionPartitionId();
@@ -95,13 +105,25 @@ public class CorrelateWorkflowInstanceSubscriptionCommand
     variables.wrap(buffer, offset, variablesLength);
     offset += variablesLength;
     decoder.limit(offset);
+
+    offset += CorrelateWorkflowInstanceSubscriptionDecoder.bpmnProcessIdHeaderLength();
+    final int bpmnProcessIdLength = decoder.bpmnProcessIdLength();
+    bpmnProcessId.wrap(buffer, offset, bpmnProcessIdLength);
+    offset += bpmnProcessIdLength;
+    decoder.limit(offset);
+
+    offset += CorrelateWorkflowInstanceSubscriptionDecoder.correlationKeyHeaderLength();
+    final int correlationKeyLength = decoder.correlationKeyLength();
+    correlationKey.wrap(buffer, offset, correlationKeyLength);
+    offset += correlationKeyLength;
+    decoder.limit(offset);
   }
 
   public int getSubscriptionPartitionId() {
     return subscriptionPartitionId;
   }
 
-  public void setSubscriptionPartitionId(int subscriptionPartitionId) {
+  public void setSubscriptionPartitionId(final int subscriptionPartitionId) {
     this.subscriptionPartitionId = subscriptionPartitionId;
   }
 
@@ -109,7 +131,7 @@ public class CorrelateWorkflowInstanceSubscriptionCommand
     return workflowInstanceKey;
   }
 
-  public void setWorkflowInstanceKey(long workflowInstanceKey) {
+  public void setWorkflowInstanceKey(final long workflowInstanceKey) {
     this.workflowInstanceKey = workflowInstanceKey;
   }
 
@@ -117,7 +139,7 @@ public class CorrelateWorkflowInstanceSubscriptionCommand
     return elementInstanceKey;
   }
 
-  public void setElementInstanceKey(long elementInstanceKey) {
+  public void setElementInstanceKey(final long elementInstanceKey) {
     this.elementInstanceKey = elementInstanceKey;
   }
 
@@ -135,5 +157,13 @@ public class CorrelateWorkflowInstanceSubscriptionCommand
 
   public DirectBuffer getVariables() {
     return variables;
+  }
+
+  public DirectBuffer getBpmnProcessId() {
+    return bpmnProcessId;
+  }
+
+  public DirectBuffer getCorrelationKey() {
+    return correlationKey;
   }
 }

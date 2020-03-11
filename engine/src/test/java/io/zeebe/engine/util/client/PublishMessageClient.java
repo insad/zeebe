@@ -14,13 +14,15 @@ import io.zeebe.protocol.impl.record.value.message.MessageRecord;
 import io.zeebe.protocol.record.Record;
 import io.zeebe.protocol.record.intent.MessageIntent;
 import io.zeebe.protocol.record.value.MessageRecordValue;
+import io.zeebe.test.util.MsgPackUtil;
 import io.zeebe.test.util.record.RecordingExporter;
 import java.time.Duration;
+import java.util.Map;
 import java.util.function.Function;
 import org.agrona.DirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
-public class PublishMessageClient {
+public final class PublishMessageClient {
 
   private static final int DEFAULT_VALUE = -1;
   private static final Duration DEFAULT_MSG_TTL = Duration.ofHours(1);
@@ -51,45 +53,53 @@ public class PublishMessageClient {
       SUCCESSFUL_EXPECTATION_SUPPLIER;
   private int partitionId = DEFAULT_VALUE;
 
-  public PublishMessageClient(StreamProcessorRule environmentRule, int partitionCount) {
-    this.enviromentRule = environmentRule;
+  public PublishMessageClient(final StreamProcessorRule environmentRule, final int partitionCount) {
+    enviromentRule = environmentRule;
     this.partitionCount = partitionCount;
 
     messageRecord = new MessageRecord();
     messageRecord.setTimeToLive(DEFAULT_MSG_TTL.toMillis());
   }
 
-  public PublishMessageClient withCorrelationKey(String correlationKey) {
+  public PublishMessageClient withCorrelationKey(final String correlationKey) {
     messageRecord.setCorrelationKey(correlationKey);
     return this;
   }
 
-  public PublishMessageClient withName(String name) {
+  public PublishMessageClient withName(final String name) {
     messageRecord.setName(name);
     return this;
   }
 
-  public PublishMessageClient withId(String id) {
+  public PublishMessageClient withId(final String id) {
     messageRecord.setMessageId(id);
     return this;
   }
 
-  public PublishMessageClient withTimeToLive(long timeToLive) {
+  public PublishMessageClient withTimeToLive(final Duration timeToLive) {
+    return withTimeToLive(timeToLive.toMillis());
+  }
+
+  public PublishMessageClient withTimeToLive(final long timeToLive) {
     messageRecord.setTimeToLive(timeToLive);
     return this;
   }
 
-  public PublishMessageClient withVariables(DirectBuffer variables) {
+  public PublishMessageClient withVariables(final Map<String, Object> variables) {
+    return withVariables(MsgPackUtil.asMsgPack(variables));
+  }
+
+  public PublishMessageClient withVariables(final DirectBuffer variables) {
     messageRecord.setVariables(variables);
     return this;
   }
 
-  public PublishMessageClient withVariables(String variables) {
+  public PublishMessageClient withVariables(final String variables) {
     messageRecord.setVariables(new UnsafeBuffer(MsgPackConverter.convertToMsgPack(variables)));
     return this;
   }
 
-  public PublishMessageClient onPartition(int partitionId) {
+  public PublishMessageClient onPartition(final int partitionId) {
     this.partitionId = partitionId;
     return this;
   }
@@ -119,7 +129,7 @@ public class PublishMessageClient {
     final String correlationKey;
     final long position;
 
-    Message(int partitionId, String correlationKey, long position) {
+    Message(final int partitionId, final String correlationKey, final long position) {
       this.partitionId = partitionId;
       this.correlationKey = correlationKey;
       this.position = position;

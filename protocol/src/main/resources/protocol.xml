@@ -1,25 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe" package="io.zeebe.protocol.record"
+<sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
+  xmlns:xi="http://www.w3.org/2001/XInclude" package="io.zeebe.protocol.record"
   id="0" version="${protocol.version}" semanticVersion="${project.version}"
   description="Zeebe Protocol" byteOrder="littleEndian">
+
+  <xi:include href="common-types.xml"/>
+
   <types>
-    <composite name="messageHeader" description="Message identifiers and length of message root">
-      <type name="blockLength" primitiveType="uint16"/>
-      <type name="templateId" primitiveType="uint16"/>
-      <type name="schemaId" primitiveType="uint16"/>
-      <type name="version" primitiveType="uint16"/>
-    </composite>
-
-    <composite name="varDataEncoding">
-      <type name="length" primitiveType="uint32" maxValue="2147483647"/>
-      <type name="varData" primitiveType="uint8" length="0" characterEncoding="UTF-8"/>
-    </composite>
-
-    <composite name="groupSizeEncoding" description="Repeating group dimensions">
-      <type name="blockLength" primitiveType="uint16"/>
-      <type name="numInGroup" primitiveType="uint8" semanticType="NumInGroup"/>
-    </composite>
-
     <enum name="errorCode" encodingType="uint8" semanticType="String"
       description="The error code of an error">
       <validValue name="INTERNAL_ERROR">0</validValue>
@@ -41,7 +28,6 @@
       <validValue name="MESSAGE">10</validValue>
       <validValue name="MESSAGE_SUBSCRIPTION">11</validValue>
       <validValue name="WORKFLOW_INSTANCE_SUBSCRIPTION">12</validValue>
-      <validValue name="EXPORTER">13</validValue>
       <validValue name="JOB_BATCH">14</validValue>
       <validValue name="TIMER">15</validValue>
       <validValue name="MESSAGE_START_EVENT_SUBSCRIPTION">16</validValue>
@@ -49,6 +35,7 @@
       <validValue name="VARIABLE_DOCUMENT">18</validValue>
       <validValue name="WORKFLOW_INSTANCE_CREATION">19</validValue>
       <validValue name="ERROR">20</validValue>
+      <validValue name="WORKFLOW_INSTANCE_RESULT">21</validValue>
     </enum>
 
     <enum name="RecordType" encodingType="uint8">
@@ -73,7 +60,7 @@
 
   <!-- L1 General Messages 0 - 99 -->
 
-  <sbe:message name="ErrorResponse" id="0" description="Standard error response">
+  <sbe:message name="ErrorResponse" id="10" description="Standard error response">
     <field name="errorCode" id="1" type="errorCode"/>
     <data name="errorData" id="2" type="varDataEncoding"/>
   </sbe:message>
@@ -127,6 +114,11 @@
       <field name="partitionId" id="9" type="int32"/>
       <field name="role" id="10" type="PartitionRole"/>
     </group>
+    <group name="partitionLeaderTerms" id="11">
+      <field name="partitionId" id="12" type="int32"/>
+      <field name="term" id="13" type="int64"/>
+    </group>
+    <data name="version" id="14" type="varDataEncoding"/>
   </sbe:message>
 
 </sbe:messageSchema>

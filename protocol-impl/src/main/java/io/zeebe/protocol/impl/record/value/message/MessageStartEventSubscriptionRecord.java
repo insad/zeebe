@@ -7,25 +7,28 @@
  */
 package io.zeebe.protocol.impl.record.value.message;
 
+import static io.zeebe.util.buffer.BufferUtil.bufferAsString;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.zeebe.msgpack.property.LongProperty;
 import io.zeebe.msgpack.property.StringProperty;
 import io.zeebe.protocol.impl.record.UnifiedRecordValue;
 import io.zeebe.protocol.record.value.MessageStartEventSubscriptionRecordValue;
-import io.zeebe.util.buffer.BufferUtil;
 import org.agrona.DirectBuffer;
 
-public class MessageStartEventSubscriptionRecord extends UnifiedRecordValue
+public final class MessageStartEventSubscriptionRecord extends UnifiedRecordValue
     implements MessageStartEventSubscriptionRecordValue {
 
   private final LongProperty workflowKeyProp = new LongProperty("workflowKey");
+  private final StringProperty bpmnProcessIdProp = new StringProperty("bpmnProcessId", "");
   private final StringProperty messageNameProp = new StringProperty("messageName", "");
   private final StringProperty startEventIdProp = new StringProperty("startEventId", "");
 
   public MessageStartEventSubscriptionRecord() {
-    this.declareProperty(workflowKeyProp)
+    declareProperty(workflowKeyProp)
         .declareProperty(messageNameProp)
-        .declareProperty(startEventIdProp);
+        .declareProperty(startEventIdProp)
+        .declareProperty(bpmnProcessIdProp);
   }
 
   @JsonIgnore
@@ -38,32 +41,48 @@ public class MessageStartEventSubscriptionRecord extends UnifiedRecordValue
     return startEventIdProp.getValue();
   }
 
+  @Override
   public long getWorkflowKey() {
     return workflowKeyProp.getValue();
   }
 
+  public MessageStartEventSubscriptionRecord setWorkflowKey(final long key) {
+    workflowKeyProp.setValue(key);
+    return this;
+  }
+
+  @Override
+  public String getBpmnProcessId() {
+    return bufferAsString(bpmnProcessIdProp.getValue());
+  }
+
   @Override
   public String getStartEventId() {
-    return BufferUtil.bufferAsString(startEventIdProp.getValue());
+    return bufferAsString(startEventIdProp.getValue());
   }
 
   @Override
   public String getMessageName() {
-    return BufferUtil.bufferAsString(messageNameProp.getValue());
+    return bufferAsString(messageNameProp.getValue());
   }
 
-  public MessageStartEventSubscriptionRecord setMessageName(DirectBuffer messageName) {
+  public MessageStartEventSubscriptionRecord setMessageName(final DirectBuffer messageName) {
     messageNameProp.setValue(messageName);
     return this;
   }
 
-  public MessageStartEventSubscriptionRecord setStartEventId(DirectBuffer startEventId) {
-    this.startEventIdProp.setValue(startEventId);
+  public MessageStartEventSubscriptionRecord setStartEventId(final DirectBuffer startEventId) {
+    startEventIdProp.setValue(startEventId);
     return this;
   }
 
-  public MessageStartEventSubscriptionRecord setWorkflowKey(long key) {
-    workflowKeyProp.setValue(key);
+  public MessageStartEventSubscriptionRecord setBpmnProcessId(final DirectBuffer bpmnProcessId) {
+    bpmnProcessIdProp.setValue(bpmnProcessId);
     return this;
+  }
+
+  @JsonIgnore
+  public DirectBuffer getBpmnProcessIdBuffer() {
+    return bpmnProcessIdProp.getValue();
   }
 }

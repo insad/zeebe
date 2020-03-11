@@ -16,6 +16,8 @@ import io.zeebe.engine.processor.workflow.handlers.activity.ActivityElementCompl
 import io.zeebe.engine.processor.workflow.handlers.activity.ActivityElementTerminatedHandler;
 import io.zeebe.engine.processor.workflow.handlers.activity.ActivityElementTerminatingHandler;
 import io.zeebe.engine.processor.workflow.handlers.activity.ActivityEventOccurredHandler;
+import io.zeebe.engine.processor.workflow.handlers.callactivity.CallActivityActivatingHandler;
+import io.zeebe.engine.processor.workflow.handlers.callactivity.CallActivityTerminatingHandler;
 import io.zeebe.engine.processor.workflow.handlers.catchevent.IntermediateCatchEventElementActivatedHandler;
 import io.zeebe.engine.processor.workflow.handlers.catchevent.IntermediateCatchEventElementActivatingHandler;
 import io.zeebe.engine.processor.workflow.handlers.catchevent.IntermediateCatchEventElementCompletingHandler;
@@ -24,6 +26,9 @@ import io.zeebe.engine.processor.workflow.handlers.catchevent.IntermediateCatchE
 import io.zeebe.engine.processor.workflow.handlers.catchevent.StartEventEventOccurredHandler;
 import io.zeebe.engine.processor.workflow.handlers.container.ContainerElementActivatedHandler;
 import io.zeebe.engine.processor.workflow.handlers.container.ContainerElementTerminatingHandler;
+import io.zeebe.engine.processor.workflow.handlers.container.ProcessCompletedHandler;
+import io.zeebe.engine.processor.workflow.handlers.container.ProcessTerminatedHandler;
+import io.zeebe.engine.processor.workflow.handlers.container.WorkflowResultSender;
 import io.zeebe.engine.processor.workflow.handlers.element.ElementActivatedHandler;
 import io.zeebe.engine.processor.workflow.handlers.element.ElementActivatingHandler;
 import io.zeebe.engine.processor.workflow.handlers.element.ElementCompletedHandler;
@@ -31,6 +36,9 @@ import io.zeebe.engine.processor.workflow.handlers.element.ElementCompletingHand
 import io.zeebe.engine.processor.workflow.handlers.element.ElementTerminatedHandler;
 import io.zeebe.engine.processor.workflow.handlers.element.ElementTerminatingHandler;
 import io.zeebe.engine.processor.workflow.handlers.element.EventOccurredHandler;
+import io.zeebe.engine.processor.workflow.handlers.endevent.ErrorEventHandler;
+import io.zeebe.engine.processor.workflow.handlers.endevent.ThrowErrorHandler;
+import io.zeebe.engine.processor.workflow.handlers.eventsubproc.EventSubProcessEventOccurredHandler;
 import io.zeebe.engine.processor.workflow.handlers.gateway.EventBasedGatewayElementActivatingHandler;
 import io.zeebe.engine.processor.workflow.handlers.gateway.EventBasedGatewayElementCompletedHandler;
 import io.zeebe.engine.processor.workflow.handlers.gateway.EventBasedGatewayElementCompletingHandler;
@@ -49,17 +57,26 @@ import io.zeebe.engine.processor.workflow.handlers.seqflow.ParallelMergeSequence
 import io.zeebe.engine.processor.workflow.handlers.seqflow.SequenceFlowTakenHandler;
 import io.zeebe.engine.processor.workflow.handlers.servicetask.ServiceTaskElementActivatedHandler;
 import io.zeebe.engine.processor.workflow.handlers.servicetask.ServiceTaskElementTerminatingHandler;
+import io.zeebe.engine.processor.workflow.message.BufferedMessageToStartEventCorrelator;
 import io.zeebe.engine.state.ZeebeState;
 import io.zeebe.protocol.record.intent.WorkflowInstanceIntent;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
-public class BpmnStepHandlers {
+public final class BpmnStepHandlers {
   private final Map<BpmnStep, BpmnStepHandler<?>> stepHandlers = new EnumMap<>(BpmnStep.class);
 
-  public BpmnStepHandlers(final ZeebeState state, final CatchEventBehavior catchEventBehavior) {
+  BpmnStepHandlers(final ZeebeState state, final CatchEventBehavior catchEventBehavior) {
     final IncidentResolver incidentResolver = new IncidentResolver(state.getIncidentState());
     final CatchEventSubscriber catchEventSubscriber = new CatchEventSubscriber(catchEventBehavior);
+    final BufferedMessageToStartEventCorrelator messageStartEventCorrelator =
+        new BufferedMessageToStartEventCorrelator(
+            state.getKeyGenerator(),
+            state.getMessageState(),
+            state.getWorkflowState().getEventScopeInstanceState());
+    final var errorEventHandler =
+        new ErrorEventHandler(state.getWorkflowState(), state.getKeyGenerator());
 
     stepHandlers.put(BpmnStep.ELEMENT_ACTIVATING, new ElementActivatingHandler<>());
     stepHandlers.put(BpmnStep.ELEMENT_ACTIVATED, new ElementActivatedHandler<>());
@@ -91,6 +108,13 @@ public class BpmnStepHandlers {
     stepHandlers.put(
         BpmnStep.CONTAINER_ELEMENT_TERMINATING,
         new ContainerElementTerminatingHandler<>(catchEventSubscriber));
+    stepHandlers.put(
+        BpmnStep.PROCESS_COMPLETED,
+        new ProcessCompletedHandler(
+            List.of(new WorkflowResultSender(), messageStartEventCorrelator)));
+    stepHandlers.put(
+        BpmnStep.PROCESS_TERMINATED,
+        new ProcessTerminatedHandler(incidentResolver, messageStartEventCorrelator));
 
     stepHandlers.put(
         BpmnStep.EVENT_BASED_GATEWAY_ELEMENT_ACTIVATING,
@@ -145,6 +169,10 @@ public class BpmnStepHandlers {
         BpmnStep.START_EVENT_EVENT_OCCURRED, new StartEventEventOccurredHandler<>(state));
 
     stepHandlers.put(
+        BpmnStep.EVENT_SUBPROC_EVENT_OCCURRED,
+        new EventSubProcessEventOccurredHandler<>(catchEventBehavior));
+
+    stepHandlers.put(
         BpmnStep.PARALLEL_MERGE_SEQUENCE_FLOW_TAKEN, new ParallelMergeSequenceFlowTaken<>());
     stepHandlers.put(BpmnStep.SEQUENCE_FLOW_TAKEN, new SequenceFlowTakenHandler<>());
 
@@ -166,6 +194,15 @@ public class BpmnStepHandlers {
     stepHandlers.put(
         BpmnStep.MULTI_INSTANCE_EVENT_OCCURRED,
         new MultiInstanceBodyEventOccurredHandler(stepHandlers::get));
+
+    stepHandlers.put(
+        BpmnStep.CALL_ACTIVITY_ACTIVATING,
+        new CallActivityActivatingHandler(catchEventSubscriber, state.getKeyGenerator()));
+    stepHandlers.put(
+        BpmnStep.CALL_ACTIVITY_TERMINATING,
+        new CallActivityTerminatingHandler(catchEventSubscriber));
+
+    stepHandlers.put(BpmnStep.THROW_ERROR, new ThrowErrorHandler(errorEventHandler));
   }
 
   public void handle(final BpmnStepContext context) {

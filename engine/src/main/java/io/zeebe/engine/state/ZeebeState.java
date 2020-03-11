@@ -54,12 +54,15 @@ public class ZeebeState {
   private final DbString lastProcessedEventKey;
   private final DbLong lastProcessedEventPosition;
   private final ColumnFamily<DbString, DbLong> lastProcessedRecordPositionColumnFamily;
+  private final int partitionId;
 
-  public ZeebeState(ZeebeDb<ZbColumnFamilies> zeebeDb, DbContext dbContext) {
+  public ZeebeState(final ZeebeDb<ZbColumnFamilies> zeebeDb, final DbContext dbContext) {
     this(Protocol.DEPLOYMENT_PARTITION, zeebeDb, dbContext);
   }
 
-  public ZeebeState(int partitionId, ZeebeDb<ZbColumnFamilies> zeebeDb, DbContext dbContext) {
+  public ZeebeState(
+      final int partitionId, final ZeebeDb<ZbColumnFamilies> zeebeDb, final DbContext dbContext) {
+    this.partitionId = partitionId;
     keyState = new KeyState(partitionId, zeebeDb, dbContext);
     workflowState = new WorkflowState(zeebeDb, dbContext, keyState);
     deploymentState = new DeploymentsState(zeebeDb, dbContext);
@@ -115,7 +118,7 @@ public class ZeebeState {
     return keyState;
   }
 
-  public boolean isOnBlacklist(TypedRecord record) {
+  public boolean isOnBlacklist(final TypedRecord record) {
     final UnpackedObject value = record.getValue();
     if (value instanceof WorkflowInstanceRelated) {
       final long workflowInstanceKey = ((WorkflowInstanceRelated) value).getWorkflowInstanceKey();
@@ -126,7 +129,8 @@ public class ZeebeState {
     return false;
   }
 
-  public boolean tryToBlacklist(TypedRecord<?> typedRecord, Consumer<Long> onBlacklistingInstance) {
+  public boolean tryToBlacklist(
+      final TypedRecord<?> typedRecord, final Consumer<Long> onBlacklistingInstance) {
     final Intent intent = typedRecord.getIntent();
     if (shouldBeBlacklisted(intent)) {
       final UnpackedObject value = typedRecord.getValue();
@@ -139,7 +143,7 @@ public class ZeebeState {
     return false;
   }
 
-  private boolean shouldBeBlacklisted(Intent intent) {
+  private boolean shouldBeBlacklisted(final Intent intent) {
 
     if (intent instanceof WorkflowInstanceRelatedIntent) {
       final WorkflowInstanceRelatedIntent workflowInstanceRelatedIntent =
@@ -151,14 +155,14 @@ public class ZeebeState {
     return false;
   }
 
-  private void blacklist(long workflowInstanceKey) {
+  private void blacklist(final long workflowInstanceKey) {
     if (workflowInstanceKey >= 0) {
       LOG.warn(BLACKLIST_INSTANCE_MESSAGE, workflowInstanceKey);
       blackList.blacklist(workflowInstanceKey);
     }
   }
 
-  public void markAsProcessed(long position) {
+  public void markAsProcessed(final long position) {
     lastProcessedEventPosition.wrapLong(position);
     lastProcessedRecordPositionColumnFamily.put(lastProcessedEventKey, lastProcessedEventPosition);
   }
@@ -166,5 +170,9 @@ public class ZeebeState {
   public long getLastSuccessfulProcessedRecordPosition() {
     final DbLong position = lastProcessedRecordPositionColumnFamily.get(lastProcessedEventKey);
     return position != null ? position.getValue() : NO_EVENTS_PROCESSED;
+  }
+
+  public int getPartitionId() {
+    return partitionId;
   }
 }

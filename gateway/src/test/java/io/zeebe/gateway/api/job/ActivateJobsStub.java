@@ -9,15 +9,15 @@ package io.zeebe.gateway.api.job;
 
 import static io.zeebe.util.buffer.BufferUtil.bufferAsString;
 
-import io.zeebe.gateway.api.util.StubbedGateway;
-import io.zeebe.gateway.api.util.StubbedGateway.RequestStub;
+import io.zeebe.gateway.api.util.StubbedBrokerClient;
+import io.zeebe.gateway.api.util.StubbedBrokerClient.RequestStub;
 import io.zeebe.gateway.impl.broker.request.BrokerActivateJobsRequest;
 import io.zeebe.gateway.impl.broker.response.BrokerResponse;
 import io.zeebe.protocol.Protocol;
 import io.zeebe.protocol.impl.encoding.MsgPackConverter;
 import io.zeebe.protocol.impl.record.value.job.JobBatchRecord;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.LongStream;
 import org.agrona.DirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -43,7 +43,7 @@ public class ActivateJobsStub
       new UnsafeBuffer(MsgPackConverter.convertToMsgPack(CUSTOM_HEADERS));
   public static final DirectBuffer VARIABLES_MSGPACK =
       new UnsafeBuffer(MsgPackConverter.convertToMsgPack(VARIABLES));
-  private Map<String, Integer> availableJobs = new HashMap<>();
+  private final Map<String, Integer> availableJobs = new ConcurrentHashMap<>();
 
   public long getJobBatchKey() {
     return JOB_BATCH_KEY;
@@ -90,7 +90,8 @@ public class ActivateJobsStub
   }
 
   @Override
-  public BrokerResponse<JobBatchRecord> handle(BrokerActivateJobsRequest request) throws Exception {
+  public BrokerResponse<JobBatchRecord> handle(final BrokerActivateJobsRequest request)
+      throws Exception {
     final int partitionId = request.getPartitionId();
 
     final JobBatchRecord requestDto = request.getRequestWriter();
@@ -111,16 +112,16 @@ public class ActivateJobsStub
         response, partitionId, Protocol.encodePartitionId(partitionId, JOB_BATCH_KEY));
   }
 
-  public void addAvailableJobs(String type, int amount) {
+  public void addAvailableJobs(final String type, final int amount) {
     availableJobs.put(type, amount);
   }
 
   private void addJobs(
-      JobBatchRecord response,
-      int partitionId,
-      int amount,
-      DirectBuffer type,
-      DirectBuffer worker) {
+      final JobBatchRecord response,
+      final int partitionId,
+      final int amount,
+      final DirectBuffer type,
+      final DirectBuffer worker) {
 
     final int availableAmount = availableJobs.computeIfAbsent(bufferAsString(type), k -> 0);
     final int jobsToActivate = Math.min(amount, availableAmount);
@@ -148,7 +149,7 @@ public class ActivateJobsStub
   }
 
   @Override
-  public void registerWith(StubbedGateway gateway) {
+  public void registerWith(final StubbedBrokerClient gateway) {
     gateway.registerHandler(BrokerActivateJobsRequest.class, this);
   }
 }

@@ -16,7 +16,7 @@ import io.zeebe.test.util.record.RecordingExporter;
 import java.util.Arrays;
 import java.util.function.Consumer;
 
-public class EmbeddedBrokerConfigurator {
+public final class EmbeddedBrokerConfigurator {
 
   public static final Consumer<BrokerCfg> DEBUG_EXPORTER =
       cfg -> cfg.getExporters().add(DebugLogExporter.defaultConfig(false));
@@ -52,6 +52,9 @@ public class EmbeddedBrokerConfigurator {
       cluster.setReplicationFactor(replicationFactor);
       cluster.setClusterSize(clusterSize);
       cluster.setClusterName(clusterName);
+      cluster.setGossipFailureTimeout(2000);
+      cluster.setGossipInterval(150);
+      cluster.setGossipProbeInterval(250);
     };
   }
 

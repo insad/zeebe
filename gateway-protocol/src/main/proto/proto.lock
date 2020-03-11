@@ -233,6 +233,57 @@
             ]
           },
           {
+            "name": "CreateWorkflowInstanceWithResultRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "request",
+                "type": "CreateWorkflowInstanceRequest"
+              },
+              {
+                "id": 2,
+                "name": "requestTimeout",
+                "type": "int64"
+              },
+              {
+                "id": 3,
+                "name": "fetchVariables",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "CreateWorkflowInstanceWithResultResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "workflowKey",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "bpmnProcessId",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "version",
+                "type": "int32"
+              },
+              {
+                "id": 4,
+                "name": "workflowInstanceKey",
+                "type": "int64"
+              },
+              {
+                "id": 5,
+                "name": "variables",
+                "type": "string"
+              }
+            ]
+          },
+          {
             "name": "DeployWorkflowRequest",
             "fields": [
               {
@@ -328,6 +379,29 @@
             "name": "FailJobResponse"
           },
           {
+            "name": "ThrowErrorRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "jobKey",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "errorCode",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "errorMessage",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "ThrowErrorResponse"
+          },
+          {
             "name": "PublishMessageRequest",
             "fields": [
               {
@@ -399,6 +473,11 @@
                 "id": 4,
                 "name": "replicationFactor",
                 "type": "int32"
+              },
+              {
+                "id": 5,
+                "name": "gatewayVersion",
+                "type": "string"
               }
             ]
           },
@@ -425,6 +504,11 @@
                 "name": "partitions",
                 "type": "Partition",
                 "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "version",
+                "type": "string"
               }
             ]
           },
@@ -482,7 +566,14 @@
             ]
           },
           {
-            "name": "SetVariablesResponse"
+            "name": "SetVariablesResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "key",
+                "type": "int64"
+              }
+            ]
           }
         ],
         "services": [
@@ -511,6 +602,11 @@
                 "out_type": "CreateWorkflowInstanceResponse"
               },
               {
+                "name": "CreateWorkflowInstanceWithResult",
+                "in_type": "CreateWorkflowInstanceWithResultRequest",
+                "out_type": "CreateWorkflowInstanceWithResultResponse"
+              },
+              {
                 "name": "DeployWorkflow",
                 "in_type": "DeployWorkflowRequest",
                 "out_type": "DeployWorkflowResponse"
@@ -519,6 +615,11 @@
                 "name": "FailJob",
                 "in_type": "FailJobRequest",
                 "out_type": "FailJobResponse"
+              },
+              {
+                "name": "ThrowError",
+                "in_type": "ThrowErrorRequest",
+                "out_type": "ThrowErrorResponse"
               },
               {
                 "name": "PublishMessage",

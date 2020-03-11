@@ -7,24 +7,24 @@
  */
 package io.zeebe.gateway.api.workflow;
 
-import io.zeebe.gateway.api.util.StubbedGateway;
-import io.zeebe.gateway.api.util.StubbedGateway.RequestStub;
+import io.zeebe.gateway.api.util.StubbedBrokerClient;
+import io.zeebe.gateway.api.util.StubbedBrokerClient.RequestStub;
 import io.zeebe.gateway.impl.broker.request.BrokerCancelWorkflowInstanceRequest;
 import io.zeebe.gateway.impl.broker.response.BrokerResponse;
 import io.zeebe.protocol.impl.record.value.workflowinstance.WorkflowInstanceRecord;
 
-public class CancelWorkflowInstanceStub
+public final class CancelWorkflowInstanceStub
     implements RequestStub<
         BrokerCancelWorkflowInstanceRequest, BrokerResponse<WorkflowInstanceRecord>> {
 
   @Override
-  public void registerWith(StubbedGateway gateway) {
+  public void registerWith(final StubbedBrokerClient gateway) {
     gateway.registerHandler(BrokerCancelWorkflowInstanceRequest.class, this);
   }
 
   @Override
-  public BrokerResponse<WorkflowInstanceRecord> handle(BrokerCancelWorkflowInstanceRequest request)
-      throws Exception {
+  public BrokerResponse<WorkflowInstanceRecord> handle(
+      final BrokerCancelWorkflowInstanceRequest request) throws Exception {
     return new BrokerResponse<>(
         new WorkflowInstanceRecord(), request.getPartitionId(), request.getKey());
   }

@@ -39,7 +39,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class OAuthCredentialsProvider implements CredentialsProvider {
+public final class OAuthCredentialsProvider implements CredentialsProvider {
   private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
   private static final ObjectReader CREDENTIALS_READER =
       JSON_MAPPER.readerFor(ZeebeClientCredentials.class);
@@ -78,8 +78,8 @@ public class OAuthCredentialsProvider implements CredentialsProvider {
   }
 
   /**
-   * @return true if the Throwable was caused by an UNAUTHENTICATED response and a new access token
-   *     could be fetched; otherwise returns false.
+   * Returns true if the Throwable was caused by an UNAUTHENTICATED response and a new access token
+   * could be fetched; otherwise returns false.
    */
   @Override
   public boolean shouldRetryRequest(final Throwable throwable) {
@@ -152,7 +152,7 @@ public class OAuthCredentialsProvider implements CredentialsProvider {
     connection.setRequestProperty("Accept", "application/json");
     connection.setDoOutput(true);
 
-    try (OutputStream os = connection.getOutputStream()) {
+    try (final OutputStream os = connection.getOutputStream()) {
       final byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
       os.write(input, 0, input.length);
     }
@@ -164,8 +164,8 @@ public class OAuthCredentialsProvider implements CredentialsProvider {
               connection.getResponseCode(), connection.getResponseMessage()));
     }
 
-    try (InputStream in = connection.getInputStream();
-        InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+    try (final InputStream in = connection.getInputStream();
+        final InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
 
       final ZeebeClientCredentials fetchedCredentials =
           CREDENTIALS_READER.readValue(CharStreams.toString(reader));

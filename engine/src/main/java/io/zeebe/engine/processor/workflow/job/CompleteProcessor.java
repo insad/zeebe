@@ -15,7 +15,7 @@ import io.zeebe.protocol.impl.record.value.job.JobRecord;
 import io.zeebe.protocol.record.RejectionType;
 import io.zeebe.protocol.record.intent.JobIntent;
 
-public class CompleteProcessor implements CommandProcessor<JobRecord> {
+public final class CompleteProcessor implements CommandProcessor<JobRecord> {
   public static final String NO_JOB_FOUND_MESSAGE =
       "Expected to complete job with key '%d', but no such job was found";
   public static final String FAILED_JOB_MESSAGE =
@@ -23,12 +23,13 @@ public class CompleteProcessor implements CommandProcessor<JobRecord> {
 
   private final JobState state;
 
-  public CompleteProcessor(JobState state) {
+  public CompleteProcessor(final JobState state) {
     this.state = state;
   }
 
   @Override
-  public void onCommand(TypedRecord<JobRecord> command, CommandControl<JobRecord> commandControl) {
+  public boolean onCommand(
+      final TypedRecord<JobRecord> command, final CommandControl<JobRecord> commandControl) {
     final long jobKey = command.getKey();
     final JobState.State jobState = state.getState(jobKey);
 
@@ -43,5 +44,6 @@ public class CompleteProcessor implements CommandProcessor<JobRecord> {
       state.complete(jobKey, job);
       commandControl.accept(JobIntent.COMPLETED, job);
     }
+    return true;
   }
 }

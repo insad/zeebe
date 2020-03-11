@@ -3,6 +3,9 @@
     "zeebe-record-workflow-instance_*"
   ],
   "order": 20,
+  "settings": {
+    "number_of_shards": 3
+  },
   "aliases": {
     "zeebe-record-workflow-instance": {}
   },
@@ -32,6 +35,12 @@
             },
             "bpmnElementType": {
               "type": "keyword"
+            },
+            "parentWorkflowInstanceKey": {
+              "type": "long"
+            },
+            "parentElementInstanceKey": {
+              "type": "long"
             }
           }
         }

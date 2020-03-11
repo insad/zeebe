@@ -25,13 +25,13 @@ import java.util.Iterator;
 import java.util.List;
 import org.junit.Test;
 
-public class ActivateJobsTest extends GatewayTest {
+public final class ActivateJobsTest extends GatewayTest {
 
   @Test
   public void shouldMapRequestAndResponse() {
     // given
     final ActivateJobsStub stub = new ActivateJobsStub();
-    stub.registerWith(gateway);
+    stub.registerWith(brokerClient);
 
     final String jobType = "testJob";
     final String worker = "testWorker";
@@ -78,7 +78,7 @@ public class ActivateJobsTest extends GatewayTest {
       JsonUtil.assertEquality(job.getVariables(), stub.getVariables());
     }
 
-    final BrokerActivateJobsRequest brokerRequest = gateway.getSingleBrokerRequest();
+    final BrokerActivateJobsRequest brokerRequest = brokerClient.getSingleBrokerRequest();
     final JobBatchRecord brokerRequestValue = brokerRequest.getRequestWriter();
     assertThat(brokerRequestValue.getMaxJobsToActivate()).isEqualTo(maxJobsToActivate);
     assertThat(brokerRequestValue.getTypeBuffer()).isEqualTo(wrapString(jobType));
@@ -93,7 +93,7 @@ public class ActivateJobsTest extends GatewayTest {
   public void shouldActivateJobsRoundRobin() {
     // given
     final ActivateJobsStub stub = new ActivateJobsStub();
-    stub.registerWith(gateway);
+    stub.registerWith(brokerClient);
 
     final String type = "test";
     final int maxJobsToActivate = 2;
@@ -112,7 +112,7 @@ public class ActivateJobsTest extends GatewayTest {
       assertThat(responses.hasNext()).isTrue();
       final ActivateJobsResponse response = responses.next();
 
-      for (ActivatedJob activatedJob : response.getJobsList()) {
+      for (final ActivatedJob activatedJob : response.getJobsList()) {
         assertThat(Protocol.decodePartitionId(activatedJob.getKey()))
             .isEqualTo(Protocol.START_PARTITION_ID + partitionOffset);
       }

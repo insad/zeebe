@@ -28,6 +28,7 @@ import io.zeebe.protocol.record.RejectionType;
 import io.zeebe.protocol.record.intent.MessageIntent;
 import io.zeebe.protocol.record.intent.MessageSubscriptionIntent;
 import io.zeebe.util.buffer.BufferUtil;
+import java.time.Duration;
 import org.agrona.DirectBuffer;
 import org.assertj.core.api.Assertions;
 import org.junit.Before;
@@ -37,9 +38,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-public class MessageStreamProcessorTest {
+public final class MessageStreamProcessorTest {
 
-  @Rule public StreamProcessorRule rule = new StreamProcessorRule();
+  @Rule public final StreamProcessorRule rule = new StreamProcessorRule();
 
   @Mock private SubscriptionCommandSender mockSubscriptionCommandSender;
 
@@ -52,7 +53,7 @@ public class MessageStreamProcessorTest {
         .thenReturn(true);
 
     when(mockSubscriptionCommandSender.correlateWorkflowInstanceSubscription(
-            anyLong(), anyLong(), any(), anyLong(), any()))
+            anyLong(), anyLong(), any(), any(), anyLong(), any(), any()))
         .thenReturn(true);
 
     when(mockSubscriptionCommandSender.closeWorkflowInstanceSubscription(
@@ -60,7 +61,8 @@ public class MessageStreamProcessorTest {
         .thenReturn(true);
 
     rule.startTypedStreamProcessor(
-        (typedRecordProcessors, zeebeState) -> {
+        (typedRecordProcessors, processingContext) -> {
+          final var zeebeState = processingContext.getZeebeState();
           MessageEventProcessors.addMessageProcessors(
               typedRecordProcessors, zeebeState, mockSubscriptionCommandSender);
           return typedRecordProcessors;
@@ -114,9 +116,11 @@ public class MessageStreamProcessorTest {
         .correlateWorkflowInstanceSubscription(
             subscription.getWorkflowInstanceKey(),
             subscription.getElementInstanceKey(),
+            subscription.getBpmnProcessIdBuffer(),
             subscription.getMessageNameBuffer(),
             messageKey,
-            message.getVariablesBuffer());
+            message.getVariablesBuffer(),
+            subscription.getCorrelationKeyBuffer());
   }
 
   @Test
@@ -148,9 +152,11 @@ public class MessageStreamProcessorTest {
         .correlateWorkflowInstanceSubscription(
             subscription.getWorkflowInstanceKey(),
             subscription.getElementInstanceKey(),
+            subscription.getBpmnProcessIdBuffer(),
             subscription.getMessageNameBuffer(),
             messageKey,
-            message.getVariablesBuffer());
+            message.getVariablesBuffer(),
+            subscription.getCorrelationKeyBuffer());
   }
 
   @Test
@@ -230,11 +236,13 @@ public class MessageStreamProcessorTest {
 
     verify(mockSubscriptionCommandSender, timeout(5_000).times(1))
         .correlateWorkflowInstanceSubscription(
-            subscription.getWorkflowInstanceKey(),
-            subscription.getElementInstanceKey(),
-            subscription.getMessageNameBuffer(),
-            messageKey,
-            message.getVariablesBuffer());
+            eq(subscription.getWorkflowInstanceKey()),
+            eq(subscription.getElementInstanceKey()),
+            any(),
+            any(),
+            eq(messageKey),
+            any(),
+            any());
   }
 
   @Test
@@ -269,16 +277,20 @@ public class MessageStreamProcessorTest {
         .correlateWorkflowInstanceSubscription(
             eq(subscription.getWorkflowInstanceKey()),
             eq(subscription.getElementInstanceKey()),
+            eq(subscription.getBpmnProcessIdBuffer()),
             any(),
             eq(firstMessageKey),
+            any(),
             any());
 
     verify(mockSubscriptionCommandSender, timeout(5_000))
         .correlateWorkflowInstanceSubscription(
             eq(subscription.getWorkflowInstanceKey()),
             eq(subscription.getElementInstanceKey()),
+            eq(subscription.getBpmnProcessIdBuffer()),
             any(),
             eq(lastMessageKey),
+            any(),
             any());
   }
 
@@ -365,21 +377,27 @@ public class MessageStreamProcessorTest {
         .correlateWorkflowInstanceSubscription(
             eq(firstSubscription.getWorkflowInstanceKey()),
             eq(firstSubscription.getElementInstanceKey()),
+            eq(firstSubscription.getBpmnProcessIdBuffer()),
             any(DirectBuffer.class),
             eq(messageKey),
-            any(DirectBuffer.class));
+            any(DirectBuffer.class),
+            eq(firstSubscription.getCorrelationKeyBuffer()));
 
     verify(mockSubscriptionCommandSender, timeout(5_000))
         .correlateWorkflowInstanceSubscription(
             eq(secondSubscription.getWorkflowInstanceKey()),
             eq(secondSubscription.getElementInstanceKey()),
+            eq(secondSubscription.getBpmnProcessIdBuffer()),
             any(DirectBuffer.class),
             eq(messageKey),
-            any(DirectBuffer.class));
+            any(DirectBuffer.class),
+            eq(secondSubscription.getCorrelationKeyBuffer()));
   }
 
   private void assertAllMessagesReceived(
-      MessageSubscriptionRecord subscription, MessageRecord first, MessageRecord second) {
+      final MessageSubscriptionRecord subscription,
+      final MessageRecord first,
+      final MessageRecord second) {
     final ArgumentCaptor<DirectBuffer> nameCaptor = ArgumentCaptor.forClass(DirectBuffer.class);
     final ArgumentCaptor<DirectBuffer> variablesCaptor =
         ArgumentCaptor.forClass(DirectBuffer.class);
@@ -402,17 +420,21 @@ public class MessageStreamProcessorTest {
         .correlateWorkflowInstanceSubscription(
             eq(subscription.getWorkflowInstanceKey()),
             eq(subscription.getElementInstanceKey()),
+            eq(subscription.getBpmnProcessIdBuffer()),
             nameCaptor.capture(),
             eq(firstMessageKey),
-            variablesCaptor.capture());
+            variablesCaptor.capture(),
+            eq(subscription.getCorrelationKeyBuffer()));
 
     verify(mockSubscriptionCommandSender, timeout(5_000))
         .correlateWorkflowInstanceSubscription(
             eq(subscription.getWorkflowInstanceKey()),
             eq(subscription.getElementInstanceKey()),
+            eq(subscription.getBpmnProcessIdBuffer()),
             nameCaptor.capture(),
             eq(lastMessageKey),
-            variablesCaptor.capture());
+            variablesCaptor.capture(),
+            eq(subscription.getCorrelationKeyBuffer()));
 
     assertThat(variablesCaptor.getAllValues().get(0)).isEqualTo(first.getVariablesBuffer());
     assertThat(nameCaptor.getValue()).isEqualTo(subscription.getMessageNameBuffer());
@@ -428,6 +450,7 @@ public class MessageStreamProcessorTest {
     subscription
         .setWorkflowInstanceKey(1L)
         .setElementInstanceKey(2L)
+        .setBpmnProcessId(wrapString("workflow"))
         .setMessageKey(-1L)
         .setMessageName(wrapString("order canceled"))
         .setCorrelationKey(wrapString("order-123"))
@@ -441,7 +464,7 @@ public class MessageStreamProcessorTest {
     message
         .setName(wrapString("order canceled"))
         .setCorrelationKey(wrapString("order-123"))
-        .setTimeToLive(1L)
+        .setTimeToLive(Duration.ofSeconds(10).toMillis())
         .setVariables(asMsgPack("orderId", "order-123"));
 
     return message;

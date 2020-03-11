@@ -12,16 +12,16 @@ import io.zeebe.engine.state.message.MessageSubscription;
 import io.zeebe.engine.state.message.MessageSubscriptionState;
 import io.zeebe.util.sched.clock.ActorClock;
 
-public class PendingMessageSubscriptionChecker implements Runnable {
+public final class PendingMessageSubscriptionChecker implements Runnable {
   private final SubscriptionCommandSender commandSender;
   private final MessageSubscriptionState subscriptionState;
 
   private final long subscriptionTimeout;
 
   public PendingMessageSubscriptionChecker(
-      SubscriptionCommandSender commandSender,
-      MessageSubscriptionState subscriptionState,
-      long subscriptionTimeout) {
+      final SubscriptionCommandSender commandSender,
+      final MessageSubscriptionState subscriptionState,
+      final long subscriptionTimeout) {
     this.commandSender = commandSender;
     this.subscriptionState = subscriptionState;
     this.subscriptionTimeout = subscriptionTimeout;
@@ -33,14 +33,16 @@ public class PendingMessageSubscriptionChecker implements Runnable {
         ActorClock.currentTimeMillis() - subscriptionTimeout, this::sendCommand);
   }
 
-  private boolean sendCommand(MessageSubscription subscription) {
+  private boolean sendCommand(final MessageSubscription subscription) {
     final boolean success =
         commandSender.correlateWorkflowInstanceSubscription(
             subscription.getWorkflowInstanceKey(),
             subscription.getElementInstanceKey(),
+            subscription.getBpmnProcessId(),
             subscription.getMessageName(),
             subscription.getMessageKey(),
-            subscription.getMessageVariables());
+            subscription.getMessageVariables(),
+            subscription.getCorrelationKey());
 
     if (success) {
       subscriptionState.updateSentTimeInTransaction(subscription, ActorClock.currentTimeMillis());

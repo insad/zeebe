@@ -11,26 +11,31 @@ import io.zeebe.util.sched.ActorControl;
 import io.zeebe.util.sched.future.ActorFuture;
 import io.zeebe.util.sched.future.CompletableActorFuture;
 import java.util.function.BooleanSupplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class EndlessRetryStrategy implements RetryStrategy {
+public final class EndlessRetryStrategy implements RetryStrategy {
+
+  private static final Logger LOG = LoggerFactory.getLogger(EndlessRetryStrategy.class);
 
   private final ActorControl actor;
   private final ActorRetryMechanism retryMechanism;
   private CompletableActorFuture<Boolean> currentFuture;
   private BooleanSupplier terminateCondition;
 
-  public EndlessRetryStrategy(ActorControl actor) {
+  public EndlessRetryStrategy(final ActorControl actor) {
     this.actor = actor;
     this.retryMechanism = new ActorRetryMechanism(actor);
   }
 
   @Override
-  public ActorFuture<Boolean> runWithRetry(OperationToRetry callable) {
+  public ActorFuture<Boolean> runWithRetry(final OperationToRetry callable) {
     return runWithRetry(callable, () -> false);
   }
 
   @Override
-  public ActorFuture<Boolean> runWithRetry(OperationToRetry callable, BooleanSupplier condition) {
+  public ActorFuture<Boolean> runWithRetry(
+      final OperationToRetry callable, final BooleanSupplier condition) {
     currentFuture = new CompletableActorFuture<>();
     terminateCondition = condition;
     retryMechanism.wrap(callable, terminateCondition, currentFuture);
@@ -43,12 +48,17 @@ public class EndlessRetryStrategy implements RetryStrategy {
   private void run() {
     try {
       retryMechanism.run();
-    } catch (Exception exception) {
+    } catch (final Exception exception) {
       if (terminateCondition.getAsBoolean()) {
         currentFuture.complete(false);
         actor.done();
       } else {
         actor.yield();
+        LOG.error(
+            "Catched exception {} with message {}, will retry...",
+            exception.getClass(),
+            exception.getMessage(),
+            exception);
       }
     }
   }

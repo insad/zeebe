@@ -37,9 +37,10 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.MockitoAnnotations;
 
-public class TransformingDeploymentCreateProcessorTest {
+public final class TransformingDeploymentCreateProcessorTest {
 
-  @Rule public StreamProcessorRule rule = new StreamProcessorRule(Protocol.DEPLOYMENT_PARTITION);
+  @Rule
+  public final StreamProcessorRule rule = new StreamProcessorRule(Protocol.DEPLOYMENT_PARTITION);
 
   private WorkflowState workflowState;
   private SubscriptionCommandSender mockSubscriptionCommandSender;
@@ -50,17 +51,18 @@ public class TransformingDeploymentCreateProcessorTest {
     mockSubscriptionCommandSender = mock(SubscriptionCommandSender.class);
 
     when(mockSubscriptionCommandSender.openMessageSubscription(
-            anyInt(), anyLong(), anyLong(), any(), any(), anyBoolean()))
+            anyInt(), anyLong(), anyLong(), any(), any(), any(), anyBoolean()))
         .thenReturn(true);
     when(mockSubscriptionCommandSender.correlateMessageSubscription(
-            anyInt(), anyLong(), anyLong(), any()))
+            anyInt(), anyLong(), anyLong(), any(), any()))
         .thenReturn(true);
     when(mockSubscriptionCommandSender.closeMessageSubscription(
             anyInt(), anyLong(), anyLong(), any(DirectBuffer.class)))
         .thenReturn(true);
 
     rule.startTypedStreamProcessor(
-        (typedRecordProcessors, zeebeState) -> {
+        (typedRecordProcessors, processingContext) -> {
+          final var zeebeState = processingContext.getZeebeState();
           workflowState = zeebeState.getWorkflowState();
           DeploymentEventProcessors.addTransformingDeploymentProcessor(
               typedRecordProcessors,

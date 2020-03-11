@@ -12,10 +12,8 @@ import io.zeebe.db.ZeebeDb;
 import io.zeebe.engine.state.ZeebeState;
 import io.zeebe.logstreams.impl.Loggers;
 import io.zeebe.logstreams.log.LogStream;
+import io.zeebe.logstreams.log.LogStreamBatchWriter;
 import io.zeebe.logstreams.log.LogStreamReader;
-import io.zeebe.servicecontainer.Service;
-import io.zeebe.servicecontainer.ServiceStartContext;
-import io.zeebe.servicecontainer.ServiceStopContext;
 import io.zeebe.util.LangUtil;
 import io.zeebe.util.sched.Actor;
 import io.zeebe.util.sched.ActorCondition;
@@ -26,7 +24,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 
-public class StreamProcessor extends Actor implements Service<StreamProcessor> {
+public class StreamProcessor extends Actor {
   private static final String ERROR_MESSAGE_RECOVER_FROM_SNAPSHOT_FAILED =
       "Expected to find event with the snapshot position %s in log stream, but nothing was found. Failed to recover '%s'.";
   private static final Logger LOG = Loggers.LOGSTREAMS_LOGGER;
@@ -43,7 +41,7 @@ public class StreamProcessor extends Actor implements Service<StreamProcessor> {
   // processing
   private final ProcessingContext processingContext;
   private final TypedRecordProcessorFactory typedRecordProcessorFactory;
-  private final LogStreamReader logStreamReader;
+  private LogStreamReader logStreamReader;
   private ActorCondition onCommitPositionUpdatedCondition;
   private long snapshotPosition = -1L;
   private ProcessingStateMachine processingStateMachine;
@@ -51,23 +49,24 @@ public class StreamProcessor extends Actor implements Service<StreamProcessor> {
   private Phase phase = Phase.REPROCESSING;
   private CompletableActorFuture<Void> openFuture;
   private CompletableActorFuture<Void> closeFuture = CompletableActorFuture.completed(null);
+  private final String actorName;
 
-  protected StreamProcessor(final StreamProcessorBuilder context) {
-    this.actorScheduler = context.getActorScheduler();
-    this.lifecycleAwareListeners = context.getLifecycleListeners();
+  protected StreamProcessor(final StreamProcessorBuilder processorBuilder) {
+    this.actorScheduler = processorBuilder.getActorScheduler();
+    this.lifecycleAwareListeners = processorBuilder.getLifecycleListeners();
 
-    this.typedRecordProcessorFactory = context.getTypedRecordProcessorFactory();
-    this.zeebeDb = context.getZeebeDb();
+    this.typedRecordProcessorFactory = processorBuilder.getTypedRecordProcessorFactory();
+    this.zeebeDb = processorBuilder.getZeebeDb();
 
     processingContext =
-        context
+        processorBuilder
             .getProcessingContext()
             .eventCache(new RecordValues())
             .actor(actor)
             .abortCondition(this::isClosed);
-    this.logStreamReader = processingContext.getLogStreamReader();
     this.logStream = processingContext.getLogStream();
     this.partitionId = logStream.getPartitionId();
+    this.actorName = buildActorName(processorBuilder.getNodeId(), "StreamProcessor-" + partitionId);
   }
 
   public static StreamProcessorBuilder builder() {
@@ -76,7 +75,41 @@ public class StreamProcessor extends Actor implements Service<StreamProcessor> {
 
   @Override
   public String getName() {
-    return "partition-" + partitionId + "-processor";
+    return actorName;
+  }
+
+  @Override
+  protected void onActorStarting() {
+    actor.runOnCompletionBlockingCurrentPhase(
+        logStream.newLogStreamBatchWriter(), this::onRetrievingWriter);
+  }
+
+  private void onRetrievingWriter(
+      final LogStreamBatchWriter batchWriter, final Throwable errorOnReceivingWriter) {
+
+    if (errorOnReceivingWriter == null) {
+      processingContext
+          .maxFragmentSize(batchWriter.getMaxFragmentLength())
+          .logStreamWriter(new TypedStreamWriterImpl(batchWriter));
+
+      actor.runOnCompletionBlockingCurrentPhase(
+          logStream.newLogStreamReader(), this::onRetrievingReader);
+    } else {
+      LOG.error(
+          "Unexpected error on retrieving batch writer from log stream.", errorOnReceivingWriter);
+      actor.close();
+    }
+  }
+
+  private void onRetrievingReader(
+      final LogStreamReader reader, final Throwable errorOnReceivingReader) {
+    if (errorOnReceivingReader == null) {
+      this.logStreamReader = reader;
+      processingContext.logStreamReader(reader);
+    } else {
+      LOG.error("Unexpected error on retrieving reader from log stream.", errorOnReceivingReader);
+      actor.close();
+    }
   }
 
   @Override
@@ -86,8 +119,6 @@ public class StreamProcessor extends Actor implements Service<StreamProcessor> {
       snapshotPosition = recoverFromSnapshot();
 
       initProcessors();
-
-      lifecycleAwareListeners.forEach(l -> l.onOpen(processingContext));
     } catch (final Throwable e) {
       onFailure(e);
       LangUtil.rethrowUnchecked(e);
@@ -100,6 +131,7 @@ public class StreamProcessor extends Actor implements Service<StreamProcessor> {
       final ReProcessingStateMachine reProcessingStateMachine =
           new ReProcessingStateMachine(processingContext);
 
+      processingContext.getLogStreamWriter().setDisabled(true);
       final ActorFuture<Void> recoverFuture =
           reProcessingStateMachine.startRecover(snapshotPosition);
 
@@ -110,6 +142,7 @@ public class StreamProcessor extends Actor implements Service<StreamProcessor> {
               LOG.error("Unexpected error on recovery happens.", throwable);
               onFailure(throwable);
             } else {
+              processingContext.getLogStreamWriter().setDisabled(false);
               onRecovered();
             }
           });
@@ -122,6 +155,7 @@ public class StreamProcessor extends Actor implements Service<StreamProcessor> {
   @Override
   protected void onActorClosing() {
     processingContext.getLogStreamReader().close();
+    processingContext.getLogStreamWriter().close();
 
     if (onCommitPositionUpdatedCondition != null) {
       logStream.removeOnCommitPositionUpdatedCondition(onCommitPositionUpdatedCondition);
@@ -140,21 +174,6 @@ public class StreamProcessor extends Actor implements Service<StreamProcessor> {
     if (!isFailed()) {
       lifecycleAwareListeners.forEach(StreamProcessorLifecycleAware::onClose);
     }
-  }
-
-  @Override
-  public void start(ServiceStartContext startContext) {
-    startContext.async(openAsync(), true);
-  }
-
-  @Override
-  public void stop(ServiceStopContext stopContext) {
-    stopContext.async(closeAsync());
-  }
-
-  @Override
-  public StreamProcessor get() {
-    return this;
   }
 
   public ActorFuture<Void> openAsync() {
@@ -223,7 +242,7 @@ public class StreamProcessor extends Actor implements Service<StreamProcessor> {
     return closeFuture;
   }
 
-  private void onFailure(Throwable throwable) {
+  private void onFailure(final Throwable throwable) {
     phase = Phase.FAILED;
     openFuture.completeExceptionally(throwable);
     closeFuture = new CompletableActorFuture<>();

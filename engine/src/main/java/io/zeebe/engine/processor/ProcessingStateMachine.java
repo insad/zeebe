@@ -30,6 +30,7 @@ import io.zeebe.util.sched.clock.ActorClock;
 import io.zeebe.util.sched.future.ActorFuture;
 import java.time.Duration;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 
 /**
@@ -90,6 +91,8 @@ public final class ProcessingStateMachine {
       "Expected to process event '{}' successfully on stream processor, but caught recoverable exception. Retry processing.";
   private static final String PROCESSING_ERROR_MESSAGE =
       "Expected to process event '%s' without errors, but exception occurred with message '%s' .";
+  private static final String NOTIFY_LISTENER_ERROR_MESSAGE =
+      "Expected to invoke processed listener for event {} successfully, but exception was thrown.";
 
   private static final String LOG_ERROR_EVENT_COMMITTED =
       "Error event was committed, we continue with processing.";
@@ -116,6 +119,7 @@ public final class ProcessingStateMachine {
   private final RecordProcessorMap recordProcessorMap;
   private final TypedEventImpl typedEvent;
   private final StreamProcessorMetrics metrics;
+  private final Consumer<TypedRecord> onProcessed;
 
   // current iteration
   private SideEffectProducer sideEffectProducer;
@@ -128,7 +132,8 @@ public final class ProcessingStateMachine {
   private boolean onErrorHandling;
   private long errorRecordPosition = -1;
 
-  public ProcessingStateMachine(ProcessingContext context, BooleanSupplier shouldProcessNext) {
+  public ProcessingStateMachine(
+      final ProcessingContext context, final BooleanSupplier shouldProcessNext) {
 
     this.actor = context.getActor();
     this.eventFilter = context.getEventFilter();
@@ -152,6 +157,7 @@ public final class ProcessingStateMachine {
         new TypedResponseWriterImpl(context.getCommandResponseWriter(), partitionId);
 
     this.metrics = new StreamProcessorMetrics(partitionId);
+    this.onProcessed = context.getOnProcessedListener();
   }
 
   private void skipRecord() {
@@ -160,16 +166,29 @@ public final class ProcessingStateMachine {
   }
 
   void readNextEvent() {
-    if (shouldProcessNext.getAsBoolean()
-        && logStreamReader.hasNext()
-        && currentProcessor == null
-        && logStream.getCommitPosition() >= errorRecordPosition) {
+    if (onErrorHandling) {
+      logStream
+          .getCommitPositionAsync()
+          .onComplete(
+              (commitPosition, error) -> {
+                if (error == null) {
+                  if (commitPosition >= errorRecordPosition) {
+                    LOG.info(LOG_ERROR_EVENT_COMMITTED);
+                    onErrorHandling = false;
 
-      if (onErrorHandling) {
-        LOG.info(LOG_ERROR_EVENT_COMMITTED);
-        onErrorHandling = false;
-      }
+                    tryToReadNextEvent();
+                  }
+                } else {
+                  LOG.error("Error on retrieving commit position", error);
+                }
+              });
+    } else {
+      tryToReadNextEvent();
+    }
+  }
 
+  private void tryToReadNextEvent() {
+    if (shouldProcessNext.getAsBoolean() && logStreamReader.hasNext() && currentProcessor == null) {
       currentEvent = logStreamReader.next();
 
       if (eventFilter == null || eventFilter.applies(currentEvent)) {
@@ -212,7 +231,7 @@ public final class ProcessingStateMachine {
     }
   }
 
-  private TypedRecordProcessor<?> chooseNextProcessor(LoggedEvent event) {
+  private TypedRecordProcessor<?> chooseNextProcessor(final LoggedEvent event) {
     TypedRecordProcessor<?> typedRecordProcessor = null;
 
     try {
@@ -249,7 +268,7 @@ public final class ProcessingStateMachine {
         });
   }
 
-  private void resetOutput(long sourceRecordPosition) {
+  private void resetOutput(final long sourceRecordPosition) {
     responseWriter.reset();
     logStreamWriter.reset();
     logStreamWriter.configureSourceContext(sourceRecordPosition);
@@ -259,7 +278,7 @@ public final class ProcessingStateMachine {
     this.sideEffectProducer = sideEffectProducer;
   }
 
-  private void onError(Throwable processingException, Runnable nextStep) {
+  private void onError(final Throwable processingException, final Runnable nextStep) {
     final ActorFuture<Boolean> retryFuture =
         updateStateRetryStrategy.runWithRetry(
             () -> {
@@ -279,13 +298,13 @@ public final class ProcessingStateMachine {
 
             onErrorHandling = true;
             nextStep.run();
-          } catch (Exception ex) {
+          } catch (final Exception ex) {
             onError(ex, nextStep);
           }
         });
   }
 
-  private void errorHandlingInTransaction(Throwable processingException) throws Exception {
+  private void errorHandlingInTransaction(final Throwable processingException) throws Exception {
     zeebeDbTransaction = dbContext.getCurrentTransaction();
     zeebeDbTransaction.run(
         () -> {
@@ -302,7 +321,7 @@ public final class ProcessingStateMachine {
         });
   }
 
-  private void writeRejectionOnCommand(Throwable exception) {
+  private void writeRejectionOnCommand(final Throwable exception) {
     final String errorMessage =
         String.format(PROCESSING_ERROR_MESSAGE, typedEvent, exception.getMessage());
     LOG.error(errorMessage, exception);
@@ -346,8 +365,14 @@ public final class ProcessingStateMachine {
               // so no other ActorJob can interfere between commit and update the positions
               if (onErrorHandling) {
                 errorRecordPosition = writtenEventPosition;
-                LOG.info(
-                    LOG_ERROR_EVENT_WRITTEN, errorRecordPosition, logStream.getCommitPosition());
+                logStream
+                    .getCommitPositionAsync()
+                    .onComplete(
+                        (commitPosition, error) -> {
+                          if (error == null) {
+                            LOG.info(LOG_ERROR_EVENT_WRITTEN, errorRecordPosition, commitPosition);
+                          }
+                        });
               }
               lastSuccessfulProcessedEventPosition = currentEvent.getPosition();
               lastWrittenEventPosition = writtenEventPosition;
@@ -367,6 +392,14 @@ public final class ProcessingStateMachine {
         });
   }
 
+  private void notifyListener() {
+    try {
+      onProcessed.accept(typedEvent);
+    } catch (final Exception e) {
+      LOG.error(NOTIFY_LISTENER_ERROR_MESSAGE, currentEvent, e);
+    }
+  }
+
   private void executeSideEffects() {
     final ActorFuture<Boolean> retryFuture =
         sideEffectsRetryStrategy.runWithRetry(sideEffectProducer::flush, abortCondition);
@@ -377,6 +410,8 @@ public final class ProcessingStateMachine {
           if (throwable != null) {
             LOG.error(ERROR_MESSAGE_EXECUTE_SIDE_EFFECT_ABORTED, currentEvent, throwable);
           }
+
+          notifyListener();
 
           // continue with next event
           currentProcessor = null;

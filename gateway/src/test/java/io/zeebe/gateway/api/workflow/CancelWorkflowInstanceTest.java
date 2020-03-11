@@ -17,13 +17,13 @@ import io.zeebe.protocol.record.ValueType;
 import io.zeebe.protocol.record.intent.WorkflowInstanceIntent;
 import org.junit.Test;
 
-public class CancelWorkflowInstanceTest extends GatewayTest {
+public final class CancelWorkflowInstanceTest extends GatewayTest {
 
   @Test
   public void shouldMapRequestAndResponse() {
     // given
     final CancelWorkflowInstanceStub stub = new CancelWorkflowInstanceStub();
-    stub.registerWith(gateway);
+    stub.registerWith(brokerClient);
 
     final CancelWorkflowInstanceRequest request =
         CancelWorkflowInstanceRequest.newBuilder().setWorkflowInstanceKey(123).build();
@@ -34,7 +34,7 @@ public class CancelWorkflowInstanceTest extends GatewayTest {
     // then
     assertThat(response).isNotNull();
 
-    final BrokerCancelWorkflowInstanceRequest brokerRequest = gateway.getSingleBrokerRequest();
+    final BrokerCancelWorkflowInstanceRequest brokerRequest = brokerClient.getSingleBrokerRequest();
     assertThat(brokerRequest.getKey()).isEqualTo(123);
     assertThat(brokerRequest.getIntent()).isEqualTo(WorkflowInstanceIntent.CANCEL);
     assertThat(brokerRequest.getValueType()).isEqualTo(ValueType.WORKFLOW_INSTANCE);

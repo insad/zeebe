@@ -9,22 +9,24 @@ package io.zeebe.engine.processor.workflow.incident;
 
 import io.zeebe.engine.processor.TypedRecordProcessors;
 import io.zeebe.engine.processor.workflow.BpmnStepProcessor;
+import io.zeebe.engine.processor.workflow.job.JobErrorThrownProcessor;
 import io.zeebe.engine.state.ZeebeState;
 import io.zeebe.protocol.record.ValueType;
 import io.zeebe.protocol.record.intent.IncidentIntent;
 
-public class IncidentEventProcessors {
+public final class IncidentEventProcessors {
 
   public static void addProcessors(
-      TypedRecordProcessors typedRecordProcessors,
-      ZeebeState zeebeState,
-      BpmnStepProcessor bpmnStepProcessor) {
+      final TypedRecordProcessors typedRecordProcessors,
+      final ZeebeState zeebeState,
+      final BpmnStepProcessor bpmnStepProcessor,
+      final JobErrorThrownProcessor jobErrorThrownProcessor) {
     typedRecordProcessors
         .onCommand(
             ValueType.INCIDENT, IncidentIntent.CREATE, new CreateIncidentProcessor(zeebeState))
         .onCommand(
             ValueType.INCIDENT,
             IncidentIntent.RESOLVE,
-            new ResolveIncidentProcessor(bpmnStepProcessor, zeebeState));
+            new ResolveIncidentProcessor(zeebeState, bpmnStepProcessor, jobErrorThrownProcessor));
   }
 }

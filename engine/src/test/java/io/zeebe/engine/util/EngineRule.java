@@ -11,6 +11,7 @@ import static io.zeebe.test.util.record.RecordingExporter.jobRecords;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.zeebe.engine.processor.CommandResponseWriter;
 import io.zeebe.engine.processor.ReadonlyProcessingContext;
 import io.zeebe.engine.processor.RecordValues;
 import io.zeebe.engine.processor.StreamProcessorLifecycleAware;
@@ -29,8 +30,8 @@ import io.zeebe.engine.util.client.JobClient;
 import io.zeebe.engine.util.client.PublishMessageClient;
 import io.zeebe.engine.util.client.VariableClient;
 import io.zeebe.engine.util.client.WorkflowInstanceClient;
-import io.zeebe.logstreams.log.BufferedLogStreamReader;
 import io.zeebe.logstreams.log.LogStream;
+import io.zeebe.logstreams.log.LogStreamReader;
 import io.zeebe.logstreams.log.LoggedEvent;
 import io.zeebe.model.bpmn.Bpmn;
 import io.zeebe.protocol.Protocol;
@@ -68,7 +69,7 @@ public final class EngineRule extends ExternalResource {
 
   private static final int PARTITION_ID = Protocol.DEPLOYMENT_PARTITION;
   private static final RecordingExporter RECORDING_EXPORTER = new RecordingExporter();
-  protected final StreamProcessorRule environmentRule;
+  private StreamProcessorRule environmentRule;
   private final RecordingExporterTestWatcher recordingExporterTestWatcher =
       new RecordingExporterTestWatcher();
   private final int partitionCount;
@@ -113,6 +114,11 @@ public final class EngineRule extends ExternalResource {
     }
   }
 
+  @Override
+  protected void after() {
+    environmentRule = null;
+  }
+
   public void start() {
     startProcessors();
   }
@@ -137,7 +143,6 @@ public final class EngineRule extends ExternalResource {
 
     forEachPartition(
         partitionId -> {
-          final int currentPartitionId = partitionId;
           environmentRule.startTypedStreamProcessor(
               partitionId,
               (processingContext) ->
@@ -145,7 +150,7 @@ public final class EngineRule extends ExternalResource {
                           processingContext,
                           partitionCount,
                           new SubscriptionCommandSender(
-                              currentPartitionId, new PartitionCommandSenderImpl()),
+                              partitionId, new PartitionCommandSenderImpl()),
                           new DeploymentDistributionImpl(),
                           (key, partition) -> {},
                           jobsAvailableCallback)
@@ -168,12 +173,14 @@ public final class EngineRule extends ExternalResource {
     forEachPartition(
         partitionId -> {
           try {
+
+            final var snapshotController = environmentRule.getStateSnapshotController(partitionId);
+
             environmentRule.closeStreamProcessor(partitionId);
-            FileUtil.deleteFolder(
-                environmentRule
-                    .getStateSnapshotController(partitionId)
-                    .getLastValidSnapshotDirectory()
-                    .toPath());
+
+            if (snapshotController.getValidSnapshotsCount() > 0) {
+              FileUtil.deleteFolder(snapshotController.getLastValidSnapshotDirectory().toPath());
+            }
           } catch (final Exception e) {
             throw new RuntimeException(e);
           }
@@ -184,7 +191,11 @@ public final class EngineRule extends ExternalResource {
     RecordingExporter.reset();
 
     startProcessors();
-    TestUtil.waitUntil(() -> RecordingExporter.getRecords().size() >= lastSize);
+    TestUtil.waitUntil(
+        () -> RecordingExporter.getRecords().size() >= lastSize,
+        "Failed to reprocess all events, only re-exported %d but expected %d",
+        RecordingExporter.getRecords().size(),
+        lastSize);
   }
 
   public List<Integer> getPartitionIds() {
@@ -248,6 +259,10 @@ public final class EngineRule extends ExternalResource {
     environmentRule.writeBatch(records);
   }
 
+  public CommandResponseWriter getCommandResponseWriter() {
+    return environmentRule.getCommandResponseWriter();
+  }
+
   /////////////////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////// PROCESSOR EXPORTER CROSSOVER ///////////////////////////////////
   /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -257,11 +272,11 @@ public final class EngineRule extends ExternalResource {
     private final RecordValues recordValues = new RecordValues();
     private final RecordMetadata metadata = new RecordMetadata();
 
-    private BufferedLogStreamReader logStreamReader;
+    private LogStreamReader logStreamReader;
     private TypedEventImpl typedEvent;
 
     @Override
-    public void onOpen(final ReadonlyProcessingContext context) {
+    public void onRecovered(final ReadonlyProcessingContext context) {
       final int partitionId = context.getLogStream().getPartitionId();
       typedEvent = new TypedEventImpl(partitionId);
       final ActorControl actor = context.getActor();
@@ -270,11 +285,22 @@ public final class EngineRule extends ExternalResource {
           actor.onCondition("on-commit", this::onNewEventCommitted);
       final LogStream logStream = context.getLogStream();
       logStream.registerOnCommitPositionUpdatedCondition(onCommitCondition);
-
-      logStreamReader = new BufferedLogStreamReader(logStream);
+      logStream
+          .newLogStreamReader()
+          .onComplete(
+              ((reader, throwable) -> {
+                if (throwable == null) {
+                  logStreamReader = reader;
+                  onNewEventCommitted();
+                }
+              }));
     }
 
     private void onNewEventCommitted() {
+      if (logStreamReader == null) {
+        return;
+      }
+
       while (logStreamReader.hasNext()) {
         final LoggedEvent rawEvent = logStreamReader.next();
         metadata.reset();
@@ -289,7 +315,7 @@ public final class EngineRule extends ExternalResource {
     }
   }
 
-  private class DeploymentDistributionImpl implements DeploymentDistributor {
+  private final class DeploymentDistributionImpl implements DeploymentDistributor {
 
     private final Map<Long, PendingDeploymentDistribution> pendingDeployments = new HashMap<>();
 
@@ -309,8 +335,13 @@ public final class EngineRule extends ExternalResource {
             final DeploymentRecord deploymentRecord = new DeploymentRecord();
             deploymentRecord.wrap(buffer);
 
-            environmentRule.writeCommandOnPartition(
-                partitionId, key, DeploymentIntent.CREATE, deploymentRecord);
+            // we run in processor actor, we are not allowed to wait on futures
+            // which means we cant get new writer in sync way
+            new Thread(
+                    () ->
+                        environmentRule.writeCommandOnPartition(
+                            partitionId, key, DeploymentIntent.CREATE, deploymentRecord))
+                .start();
           });
 
       return CompletableActorFuture.completed(null);
@@ -325,7 +356,8 @@ public final class EngineRule extends ExternalResource {
   private class PartitionCommandSenderImpl implements PartitionCommandSender {
 
     private final SubscriptionCommandMessageHandler handler =
-        new SubscriptionCommandMessageHandler(Runnable::run, environmentRule::getLogStream);
+        new SubscriptionCommandMessageHandler(
+            Runnable::run, environmentRule::getLogStreamRecordWriter);
 
     @Override
     public boolean sendCommand(final int receiverPartitionId, final BufferWriter command) {

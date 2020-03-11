@@ -22,13 +22,13 @@ import io.zeebe.test.util.MsgPackUtil;
 import java.util.Collections;
 import org.junit.Test;
 
-public class SetVariablesTest extends GatewayTest {
+public final class SetVariablesTest extends GatewayTest {
 
   @Test
   public void shouldMapRequestAndResponse() {
     // given
     final SetVariablesStub stub = new SetVariablesStub();
-    stub.registerWith(gateway);
+    stub.registerWith(brokerClient);
 
     final String variables = JsonUtil.toJson(Collections.singletonMap("key", "value"));
 
@@ -45,8 +45,9 @@ public class SetVariablesTest extends GatewayTest {
 
     // then
     assertThat(response).isNotNull();
+    assertThat(response.getKey()).isEqualTo(stub.getKey());
 
-    final BrokerSetVariablesRequest brokerRequest = gateway.getSingleBrokerRequest();
+    final BrokerSetVariablesRequest brokerRequest = brokerClient.getSingleBrokerRequest();
     assertThat(brokerRequest.getKey()).isEqualTo(-1);
     assertThat(brokerRequest.getIntent()).isEqualTo(VariableDocumentIntent.UPDATE);
     assertThat(brokerRequest.getValueType()).isEqualTo(ValueType.VARIABLE_DOCUMENT);

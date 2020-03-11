@@ -9,14 +9,13 @@ package io.zeebe.engine.processor.workflow.message;
 
 import io.zeebe.engine.processor.ReadonlyProcessingContext;
 import io.zeebe.engine.processor.StreamProcessorLifecycleAware;
-import io.zeebe.engine.processor.TypedStreamWriterImpl;
 import io.zeebe.engine.processor.workflow.message.command.SubscriptionCommandSender;
 import io.zeebe.engine.state.message.MessageState;
 import io.zeebe.engine.state.message.MessageSubscriptionState;
 import io.zeebe.util.sched.ActorControl;
 import java.time.Duration;
 
-public class MessageObserver implements StreamProcessorLifecycleAware {
+public final class MessageObserver implements StreamProcessorLifecycleAware {
 
   public static final Duration MESSAGE_TIME_TO_LIVE_CHECK_INTERVAL = Duration.ofSeconds(60);
 
@@ -28,26 +27,21 @@ public class MessageObserver implements StreamProcessorLifecycleAware {
   private final MessageSubscriptionState subscriptionState;
 
   public MessageObserver(
-      MessageState messageState,
-      MessageSubscriptionState subscriptionState,
-      SubscriptionCommandSender subscriptionCommandSender) {
+      final MessageState messageState,
+      final MessageSubscriptionState subscriptionState,
+      final SubscriptionCommandSender subscriptionCommandSender) {
     this.subscriptionCommandSender = subscriptionCommandSender;
     this.messageState = messageState;
     this.subscriptionState = subscriptionState;
   }
 
   @Override
-  public void onOpen(ReadonlyProcessingContext processingContext) {
-
-    final ActorControl actor = processingContext.getActor();
-
-    final TypedStreamWriterImpl typedStreamWriter =
-        new TypedStreamWriterImpl(processingContext.getLogStream());
+  public void onRecovered(ReadonlyProcessingContext context) {
+    final ActorControl actor = context.getActor();
+    // it is safe to reuse the write because we running in the same actor/thread
     final MessageTimeToLiveChecker timeToLiveChecker =
-        new MessageTimeToLiveChecker(typedStreamWriter, messageState);
-    processingContext
-        .getActor()
-        .runAtFixedRate(MESSAGE_TIME_TO_LIVE_CHECK_INTERVAL, timeToLiveChecker);
+        new MessageTimeToLiveChecker(context.getLogStreamWriter(), messageState);
+    context.getActor().runAtFixedRate(MESSAGE_TIME_TO_LIVE_CHECK_INTERVAL, timeToLiveChecker);
 
     final PendingMessageSubscriptionChecker pendingSubscriptionChecker =
         new PendingMessageSubscriptionChecker(

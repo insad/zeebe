@@ -16,8 +16,9 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
-public class MessageSubscription implements DbValue {
+public final class MessageSubscription implements DbValue {
 
+  private final DirectBuffer bpmnProcessId = new UnsafeBuffer();
   private final DirectBuffer messageName = new UnsafeBuffer();
   private final DirectBuffer correlationKey = new UnsafeBuffer();
   private final DirectBuffer messageVariables = new UnsafeBuffer();
@@ -31,17 +32,23 @@ public class MessageSubscription implements DbValue {
   public MessageSubscription() {}
 
   public MessageSubscription(
-      long workflowInstanceKey,
-      long elementInstanceKey,
-      DirectBuffer messageName,
-      DirectBuffer correlationKey,
-      boolean closeOnCorrelate) {
+      final long workflowInstanceKey,
+      final long elementInstanceKey,
+      final DirectBuffer bpmnProcessId,
+      final DirectBuffer messageName,
+      final DirectBuffer correlationKey,
+      final boolean closeOnCorrelate) {
     this.workflowInstanceKey = workflowInstanceKey;
     this.elementInstanceKey = elementInstanceKey;
 
+    this.bpmnProcessId.wrap(bpmnProcessId);
     this.messageName.wrap(messageName);
     this.correlationKey.wrap(correlationKey);
     this.closeOnCorrelate = closeOnCorrelate;
+  }
+
+  public DirectBuffer getBpmnProcessId() {
+    return bpmnProcessId;
   }
 
   public DirectBuffer getMessageName() {
@@ -56,8 +63,8 @@ public class MessageSubscription implements DbValue {
     return messageVariables;
   }
 
-  public void setMessageVariables(DirectBuffer variables) {
-    this.messageVariables.wrap(variables);
+  public void setMessageVariables(final DirectBuffer variables) {
+    messageVariables.wrap(variables);
   }
 
   public long getWorkflowInstanceKey() {
@@ -68,7 +75,7 @@ public class MessageSubscription implements DbValue {
     return elementInstanceKey;
   }
 
-  public void setElementInstanceKey(long elementInstanceKey) {
+  public void setElementInstanceKey(final long elementInstanceKey) {
     this.elementInstanceKey = elementInstanceKey;
   }
 
@@ -84,7 +91,7 @@ public class MessageSubscription implements DbValue {
     return commandSentTime;
   }
 
-  public void setCommandSentTime(long commandSentTime) {
+  public void setCommandSentTime(final long commandSentTime) {
     this.commandSentTime = commandSentTime;
   }
 
@@ -96,40 +103,42 @@ public class MessageSubscription implements DbValue {
     return closeOnCorrelate;
   }
 
-  public void setCloseOnCorrelate(boolean closeOnCorrelate) {
+  public void setCloseOnCorrelate(final boolean closeOnCorrelate) {
     this.closeOnCorrelate = closeOnCorrelate;
   }
 
   @Override
   public void wrap(final DirectBuffer buffer, int offset, final int length) {
-    this.workflowInstanceKey = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
+    workflowInstanceKey = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
     offset += Long.BYTES;
 
-    this.elementInstanceKey = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
+    elementInstanceKey = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
     offset += Long.BYTES;
 
-    this.messageKey = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
+    messageKey = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
     offset += Long.BYTES;
 
-    this.commandSentTime = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
+    commandSentTime = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
     offset += Long.BYTES;
 
-    this.closeOnCorrelate = buffer.getByte(offset) == 1;
+    closeOnCorrelate = buffer.getByte(offset) == 1;
     offset += 1;
 
     offset = readIntoBuffer(buffer, offset, messageName);
     offset = readIntoBuffer(buffer, offset, correlationKey);
-    readIntoBuffer(buffer, offset, messageVariables);
+    offset = readIntoBuffer(buffer, offset, messageVariables);
+    readIntoBuffer(buffer, offset, bpmnProcessId);
   }
 
   @Override
   public int getLength() {
     return 1
         + Long.BYTES * 4
-        + Integer.BYTES * 3
+        + Integer.BYTES * 4
         + messageName.capacity()
         + correlationKey.capacity()
-        + messageVariables.capacity();
+        + messageVariables.capacity()
+        + bpmnProcessId.capacity();
   }
 
   @Override
@@ -152,6 +161,8 @@ public class MessageSubscription implements DbValue {
     offset = writeIntoBuffer(buffer, offset, messageName);
     offset = writeIntoBuffer(buffer, offset, correlationKey);
     offset = writeIntoBuffer(buffer, offset, messageVariables);
+    offset = writeIntoBuffer(buffer, offset, bpmnProcessId);
+
     assert offset == getLength() : "End offset differs with getLength()";
   }
 }

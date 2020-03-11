@@ -19,10 +19,13 @@ import static io.zeebe.model.bpmn.validation.ExpectedValidationResult.expect;
 import static java.util.Collections.singletonList;
 
 import io.zeebe.model.bpmn.Bpmn;
+import io.zeebe.model.bpmn.BpmnModelInstance;
 import io.zeebe.model.bpmn.builder.AbstractCatchEventBuilder;
+import io.zeebe.model.bpmn.builder.ProcessBuilder;
 import io.zeebe.model.bpmn.instance.CompensateEventDefinition;
 import io.zeebe.model.bpmn.instance.EndEvent;
 import io.zeebe.model.bpmn.instance.IntermediateCatchEvent;
+import io.zeebe.model.bpmn.instance.SignalEventDefinition;
 import java.util.Arrays;
 import org.junit.runners.Parameterized.Parameters;
 
@@ -47,7 +50,7 @@ public class ZeebeValidationTest extends AbstractZeebeValidationTest {
             .id("eventDefinition")
             .done(),
         Arrays.asList(
-            expect("end", "Must be a none end event"),
+            expect("end", "End events must be one of: none or error"),
             expect("eventDefinition", "Event definition of this type is not supported"))
       },
       {
@@ -96,8 +99,40 @@ public class ZeebeValidationTest extends AbstractZeebeValidationTest {
         singletonList(
             expect(
                 "task",
-                "Multiple message boundary events with the same name 'message' are not allowed."))
+                "Multiple message event definitions with the same name 'message' are not allowed."))
       },
+      {
+        eventSubprocWithNoneStart(),
+        singletonList(
+            expect(
+                "subprocess",
+                "Start events in event subprocesses must be one of: message, timer, error"))
+      },
+      {
+        eventSubprocWithSignalStart(),
+        Arrays.asList(
+            expect(SignalEventDefinition.class, "Event definition of this type is not supported"),
+            expect(
+                "subprocess",
+                "Start events in event subprocesses must be one of: message, timer, error"))
+      }
     };
+  }
+
+  private static BpmnModelInstance eventSubprocWithNoneStart() {
+    final ProcessBuilder processBuilder = Bpmn.createExecutableProcess("process");
+    processBuilder.startEvent().endEvent();
+    return processBuilder.eventSubProcess("subprocess").startEvent("start_event").endEvent().done();
+  }
+
+  private static BpmnModelInstance eventSubprocWithSignalStart() {
+    final ProcessBuilder processBuilder = Bpmn.createExecutableProcess("process");
+    processBuilder.startEvent().endEvent();
+    return processBuilder
+        .eventSubProcess("subprocess")
+        .startEvent("start_event")
+        .signal("signal")
+        .endEvent()
+        .done();
   }
 }

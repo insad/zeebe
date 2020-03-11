@@ -10,55 +10,53 @@ package io.zeebe.logstreams.state;
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
 
 import io.zeebe.util.FileUtil;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import org.agrona.IoUtil;
 import org.slf4j.Logger;
 
-public class FileSnapshotConsumer implements SnapshotConsumer {
+public final class FileSnapshotConsumer implements SnapshotConsumer {
 
-  private final StateStorage stateStorage;
+  private final SnapshotStorage storage;
   private final Logger logger;
 
-  public FileSnapshotConsumer(StateStorage stateStorage, Logger logger) {
-    this.stateStorage = stateStorage;
+  public FileSnapshotConsumer(final SnapshotStorage storage, final Logger logger) {
+    this.storage = storage;
     this.logger = logger;
   }
 
   @Override
-  public boolean consumeSnapshotChunk(SnapshotChunk chunk) {
-    return writeChunkToDisk(chunk, stateStorage);
+  public boolean consumeSnapshotChunk(final SnapshotChunk chunk) {
+    return writeChunkToDisk(chunk, storage);
   }
 
   @Override
-  public boolean completeSnapshot(long snapshotId) {
-    return moveValidSnapshot(stateStorage, snapshotId);
+  public boolean completeSnapshot(final String snapshotId) {
+    return storage.commitSnapshot(storage.getPendingDirectoryFor(snapshotId));
   }
 
   @Override
-  public void invalidateSnapshot(long snapshotId) {
-    final File tmpSnapshotDirectory =
-        stateStorage.getTmpSnapshotDirectoryFor(Long.toString(snapshotId));
+  public void invalidateSnapshot(final String snapshotId) {
+    final var pendingDirectory = storage.getPendingDirectoryFor(snapshotId);
     try {
-      if (tmpSnapshotDirectory.exists()) {
-        FileUtil.deleteFolder(tmpSnapshotDirectory.toPath());
+      if (Files.exists(pendingDirectory)) {
+        FileUtil.deleteFolder(pendingDirectory);
       }
-    } catch (IOException e) {
-      logger.debug(
-          "Could not delete temporary snapshot directory {}", tmpSnapshotDirectory.toPath());
+    } catch (final IOException e) {
+      logger.debug("Could not delete temporary snapshot directory {}", pendingDirectory, e);
     }
   }
 
-  private boolean writeChunkToDisk(SnapshotChunk snapshotChunk, StateStorage storage) {
-    final long snapshotPosition = snapshotChunk.getSnapshotPosition();
-    final String snapshotName = Long.toString(snapshotPosition);
+  private boolean writeChunkToDisk(
+      final SnapshotChunk snapshotChunk, final SnapshotStorage storage) {
+    final String snapshotId = snapshotChunk.getSnapshotId();
     final String chunkName = snapshotChunk.getChunkName();
 
-    if (storage.existSnapshot(snapshotPosition)) {
+    if (storage.exists(snapshotId)) {
       logger.debug(
-          "Ignore snapshot chunk {}, because snapshot {} already exists.", chunkName, snapshotName);
+          "Ignore snapshot chunk {}, because snapshot {} already exists.", chunkName, snapshotId);
       return true;
     }
 
@@ -70,55 +68,33 @@ public class FileSnapshotConsumer implements SnapshotConsumer {
           "Expected to have checksum {} for snapshot chunk file {} ({}), but calculated {}",
           expectedChecksum,
           chunkName,
-          snapshotName,
+          snapshotId,
           actualChecksum);
       return false;
     }
 
-    final File tmpSnapshotDirectory = storage.getTmpSnapshotDirectoryFor(snapshotName);
-    if (!tmpSnapshotDirectory.exists()) {
-      tmpSnapshotDirectory.mkdirs();
-    }
+    final var tmpSnapshotDirectory = storage.getPendingDirectoryFor(snapshotId);
+    IoUtil.ensureDirectoryExists(tmpSnapshotDirectory.toFile(), "Temporary snapshot directory");
 
-    final File snapshotFile = new File(tmpSnapshotDirectory, chunkName);
-    if (snapshotFile.exists()) {
+    final var snapshotFile = tmpSnapshotDirectory.resolve(chunkName);
+    if (Files.exists(snapshotFile)) {
       logger.debug("Received a snapshot chunk which already exist '{}'.", snapshotFile);
       return false;
     }
 
-    logger.debug("Consume snapshot chunk {}", chunkName);
+    logger.debug("Consume snapshot chunk {} of snapshot {}", chunkName, snapshotId);
     return writeReceivedSnapshotChunk(snapshotChunk, snapshotFile);
   }
 
-  private boolean writeReceivedSnapshotChunk(SnapshotChunk snapshotChunk, File snapshotFile) {
+  private boolean writeReceivedSnapshotChunk(
+      final SnapshotChunk snapshotChunk, final Path snapshotFile) {
     try {
-      Files.write(
-          snapshotFile.toPath(), snapshotChunk.getContent(), CREATE_NEW, StandardOpenOption.WRITE);
-      logger.trace("Wrote replicated snapshot chunk to file {}", snapshotFile.toPath());
+      Files.write(snapshotFile, snapshotChunk.getContent(), CREATE_NEW, StandardOpenOption.WRITE);
+      logger.trace("Wrote replicated snapshot chunk to file {}", snapshotFile);
       return true;
-    } catch (IOException ioe) {
+    } catch (final IOException ioe) {
       logger.error(
           "Unexpected error occurred on writing snapshot chunk to '{}'.", snapshotFile, ioe);
-      return false;
-    }
-  }
-
-  private boolean moveValidSnapshot(StateStorage storage, long snapshotId) {
-    final File validSnapshotDirectory = storage.getSnapshotDirectoryFor(snapshotId);
-    final File tmpSnapshotDirectory = storage.getTmpSnapshotDirectoryFor(Long.toString(snapshotId));
-
-    try {
-      Files.move(tmpSnapshotDirectory.toPath(), validSnapshotDirectory.toPath());
-      logger.debug("Moved snapshot {} to {}", snapshotId, validSnapshotDirectory.toPath());
-      return true;
-    } catch (FileAlreadyExistsException e) {
-      return true;
-    } catch (IOException ioe) {
-      logger.error(
-          "Unexpected error occurred when moving snapshot {} to {}",
-          snapshotId,
-          validSnapshotDirectory.toPath(),
-          ioe);
       return false;
     }
   }

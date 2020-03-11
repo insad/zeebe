@@ -12,13 +12,14 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
-public class OpenMessageSubscriptionCommand
+public final class OpenMessageSubscriptionCommand
     extends SbeBufferWriterReader<OpenMessageSubscriptionEncoder, OpenMessageSubscriptionDecoder> {
 
   private final OpenMessageSubscriptionEncoder encoder = new OpenMessageSubscriptionEncoder();
   private final OpenMessageSubscriptionDecoder decoder = new OpenMessageSubscriptionDecoder();
   private final UnsafeBuffer messageName = new UnsafeBuffer(0, 0);
   private final UnsafeBuffer correlationKey = new UnsafeBuffer(0, 0);
+  private final UnsafeBuffer bpmnProcessId = new UnsafeBuffer(0, 0);
   private int subscriptionPartitionId;
   private long workflowInstanceKey;
   private long elementInstanceKey;
@@ -41,6 +42,7 @@ public class OpenMessageSubscriptionCommand
     elementInstanceKey = OpenMessageSubscriptionDecoder.elementInstanceKeyNullValue();
     messageName.wrap(0, 0);
     correlationKey.wrap(0, 0);
+    bpmnProcessId.wrap(0, 0);
   }
 
   @Override
@@ -49,11 +51,13 @@ public class OpenMessageSubscriptionCommand
         + OpenMessageSubscriptionDecoder.messageNameHeaderLength()
         + messageName.capacity()
         + OpenMessageSubscriptionDecoder.correlationKeyHeaderLength()
-        + correlationKey.capacity();
+        + correlationKey.capacity()
+        + OpenMessageSubscriptionDecoder.bpmnProcessIdHeaderLength()
+        + bpmnProcessId.capacity();
   }
 
   @Override
-  public void write(MutableDirectBuffer buffer, int offset) {
+  public void write(final MutableDirectBuffer buffer, final int offset) {
     super.write(buffer, offset);
 
     encoder
@@ -62,11 +66,12 @@ public class OpenMessageSubscriptionCommand
         .elementInstanceKey(elementInstanceKey)
         .closeOnCorrelate(closeOnCorrelate ? BooleanType.TRUE : BooleanType.FALSE)
         .putMessageName(messageName, 0, messageName.capacity())
-        .putCorrelationKey(correlationKey, 0, correlationKey.capacity());
+        .putCorrelationKey(correlationKey, 0, correlationKey.capacity())
+        .putBpmnProcessId(bpmnProcessId, 0, bpmnProcessId.capacity());
   }
 
   @Override
-  public void wrap(DirectBuffer buffer, int offset, int length) {
+  public void wrap(final DirectBuffer buffer, int offset, final int length) {
     super.wrap(buffer, offset, length);
 
     subscriptionPartitionId = decoder.subscriptionPartitionId();
@@ -87,13 +92,19 @@ public class OpenMessageSubscriptionCommand
     correlationKey.wrap(buffer, offset, correlationKeyLength);
     offset += correlationKeyLength;
     decoder.limit(offset);
+
+    offset += OpenMessageSubscriptionDecoder.bpmnProcessIdHeaderLength();
+    final int bpmnProcessIdLength = decoder.bpmnProcessIdLength();
+    bpmnProcessId.wrap(buffer, offset, bpmnProcessIdLength);
+    offset += bpmnProcessIdLength;
+    decoder.limit(offset);
   }
 
   public int getSubscriptionPartitionId() {
     return subscriptionPartitionId;
   }
 
-  public void setSubscriptionPartitionId(int subscriptionPartitionId) {
+  public void setSubscriptionPartitionId(final int subscriptionPartitionId) {
     this.subscriptionPartitionId = subscriptionPartitionId;
   }
 
@@ -101,7 +112,7 @@ public class OpenMessageSubscriptionCommand
     return workflowInstanceKey;
   }
 
-  public void setWorkflowInstanceKey(long workflowInstanceKey) {
+  public void setWorkflowInstanceKey(final long workflowInstanceKey) {
     this.workflowInstanceKey = workflowInstanceKey;
   }
 
@@ -109,7 +120,7 @@ public class OpenMessageSubscriptionCommand
     return elementInstanceKey;
   }
 
-  public void setElementInstanceKey(long elementInstanceKey) {
+  public void setElementInstanceKey(final long elementInstanceKey) {
     this.elementInstanceKey = elementInstanceKey;
   }
 
@@ -125,7 +136,11 @@ public class OpenMessageSubscriptionCommand
     return closeOnCorrelate;
   }
 
-  public void setCloseOnCorrelate(boolean closeOnCorrelate) {
+  public void setCloseOnCorrelate(final boolean closeOnCorrelate) {
     this.closeOnCorrelate = closeOnCorrelate;
+  }
+
+  public DirectBuffer getBpmnProcessId() {
+    return bpmnProcessId;
   }
 }

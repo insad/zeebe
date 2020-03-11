@@ -15,7 +15,7 @@ import io.zeebe.model.bpmn.instance.Process;
 import io.zeebe.protocol.record.intent.WorkflowInstanceIntent;
 import io.zeebe.protocol.record.value.BpmnElementType;
 
-public class ProcessTransformer implements ModelElementTransformer<Process> {
+public final class ProcessTransformer implements ModelElementTransformer<Process> {
 
   @Override
   public Class<Process> getType() {
@@ -23,7 +23,7 @@ public class ProcessTransformer implements ModelElementTransformer<Process> {
   }
 
   @Override
-  public void transform(Process element, TransformContext context) {
+  public void transform(final Process element, final TransformContext context) {
 
     final String id = element.getId();
     final ExecutableWorkflow workflow = new ExecutableWorkflow(id);
@@ -33,16 +33,16 @@ public class ProcessTransformer implements ModelElementTransformer<Process> {
     context.setCurrentWorkflow(workflow);
 
     workflow.bindLifecycleState(
-        WorkflowInstanceIntent.ELEMENT_ACTIVATING, BpmnStep.ELEMENT_ACTIVATING);
+        WorkflowInstanceIntent.ELEMENT_ACTIVATING, BpmnStep.ACTIVITY_ELEMENT_ACTIVATING);
     workflow.bindLifecycleState(
         WorkflowInstanceIntent.ELEMENT_ACTIVATED, BpmnStep.CONTAINER_ELEMENT_ACTIVATED);
     workflow.bindLifecycleState(
         WorkflowInstanceIntent.ELEMENT_COMPLETING, BpmnStep.ELEMENT_COMPLETING);
     workflow.bindLifecycleState(
-        WorkflowInstanceIntent.ELEMENT_COMPLETED, BpmnStep.ELEMENT_COMPLETED);
+        WorkflowInstanceIntent.ELEMENT_COMPLETED, BpmnStep.PROCESS_COMPLETED);
     workflow.bindLifecycleState(
         WorkflowInstanceIntent.ELEMENT_TERMINATING, BpmnStep.CONTAINER_ELEMENT_TERMINATING);
     workflow.bindLifecycleState(
-        WorkflowInstanceIntent.ELEMENT_TERMINATED, BpmnStep.ELEMENT_TERMINATED);
+        WorkflowInstanceIntent.ELEMENT_TERMINATED, BpmnStep.PROCESS_TERMINATED);
   }
 }

@@ -35,11 +35,11 @@ import org.junit.Test;
 import org.mockito.InOrder;
 import org.mockito.verification.VerificationWithTimeout;
 
-public class StreamProcessorReprocessingTest {
+public final class StreamProcessorReprocessingTest {
   private static final long TIMEOUT_MILLIS = 2_000L;
   private static final VerificationWithTimeout TIMEOUT = timeout(TIMEOUT_MILLIS);
 
-  @Rule public StreamProcessorRule streamProcessorRule = new StreamProcessorRule();
+  @Rule public final StreamProcessorRule streamProcessorRule = new StreamProcessorRule();
 
   @Test
   public void shouldCallRecordProcessorLifecycle() {
@@ -58,12 +58,11 @@ public class StreamProcessorReprocessingTest {
 
     // when
     final TypedRecordProcessor typedRecordProcessor = mock(TypedRecordProcessor.class);
-    final StreamProcessor streamProcessor =
-        streamProcessorRule.startTypedStreamProcessor(
-            (processors, state) ->
-                processors
-                    .onEvent(ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATING, typedRecordProcessor)
-                    .onEvent(ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATED, typedRecordProcessor));
+    streamProcessorRule.startTypedStreamProcessor(
+        (processors, context) ->
+            processors
+                .onEvent(ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATING, typedRecordProcessor)
+                .onEvent(ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATED, typedRecordProcessor));
 
     verify(typedRecordProcessor, TIMEOUT.times(1))
         .processRecord(eq(secondPosition), any(), any(), any(), any());
@@ -71,7 +70,6 @@ public class StreamProcessorReprocessingTest {
 
     // then
     final InOrder inOrder = inOrder(typedRecordProcessor);
-    inOrder.verify(typedRecordProcessor, TIMEOUT.times(2)).onOpen(any());
     // reprocessing
     inOrder
         .verify(typedRecordProcessor, TIMEOUT.times(1))
@@ -107,7 +105,7 @@ public class StreamProcessorReprocessingTest {
     // when
     final TypedRecordProcessor typedRecordProcessor = mock(TypedRecordProcessor.class);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors
                 .onEvent(ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATING, typedRecordProcessor)
                 .onEvent(ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATED, typedRecordProcessor));
@@ -118,7 +116,6 @@ public class StreamProcessorReprocessingTest {
 
     // then
     final InOrder inOrder = inOrder(typedRecordProcessor);
-    inOrder.verify(typedRecordProcessor, TIMEOUT.times(2)).onOpen(any());
     // reprocessing
     inOrder
         .verify(typedRecordProcessor, TIMEOUT.times(1))
@@ -155,12 +152,11 @@ public class StreamProcessorReprocessingTest {
 
     // when
     final TypedRecordProcessor typedRecordProcessor = mock(TypedRecordProcessor.class);
-    final StreamProcessor streamProcessor =
-        streamProcessorRule.startTypedStreamProcessor(
-            (processors, state) ->
-                processors
-                    .onEvent(ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATING, typedRecordProcessor)
-                    .onEvent(ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATED, typedRecordProcessor));
+    streamProcessorRule.startTypedStreamProcessor(
+        (processors, context) ->
+            processors
+                .onEvent(ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATING, typedRecordProcessor)
+                .onEvent(ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATED, typedRecordProcessor));
 
     verify(typedRecordProcessor, TIMEOUT.times(1))
         .processRecord(eq(secondPosition), any(), any(), any(), any());
@@ -168,7 +164,6 @@ public class StreamProcessorReprocessingTest {
 
     // then
     final InOrder inOrder = inOrder(typedRecordProcessor);
-    inOrder.verify(typedRecordProcessor, TIMEOUT.times(2)).onOpen(any());
     // no reprocessing
     inOrder.verify(typedRecordProcessor, TIMEOUT.times(2)).onRecovered(any());
     // normal processing
@@ -211,13 +206,12 @@ public class StreamProcessorReprocessingTest {
         .when(typedRecordProcessor)
         .processRecord(anyLong(), any(), any(), any(), any());
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors.onEvent(
                 ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATING, typedRecordProcessor));
 
     // then
     final InOrder inOrder = inOrder(typedRecordProcessor);
-    inOrder.verify(typedRecordProcessor, TIMEOUT.times(1)).onOpen(any());
     inOrder
         .verify(typedRecordProcessor, TIMEOUT.times(2))
         .processRecord(eq(firstPosition), any(), any(), any(), any());
@@ -237,13 +231,12 @@ public class StreamProcessorReprocessingTest {
     // when
     final TypedRecordProcessor<?> typedRecordProcessor = mock(TypedRecordProcessor.class);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors.onEvent(
                 ValueType.WORKFLOW_INSTANCE, ELEMENT_ACTIVATING, typedRecordProcessor));
 
     // then
     final InOrder inOrder = inOrder(typedRecordProcessor);
-    inOrder.verify(typedRecordProcessor, TIMEOUT.times(1)).onOpen(any());
     inOrder
         .verify(typedRecordProcessor, never())
         .processRecord(eq(firstPosition), any(), any(), any(), any());
@@ -273,7 +266,7 @@ public class StreamProcessorReprocessingTest {
     // when
     final CountDownLatch processLatch = new CountDownLatch(1);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors
                 .onEvent(
                     ValueType.WORKFLOW_INSTANCE,
@@ -281,11 +274,11 @@ public class StreamProcessorReprocessingTest {
                     new TypedRecordProcessor<UnifiedRecordValue>() {
                       @Override
                       public void processRecord(
-                          long position,
-                          TypedRecord<UnifiedRecordValue> record,
-                          TypedResponseWriter responseWriter,
-                          TypedStreamWriter streamWriter,
-                          Consumer<SideEffectProducer> sideEffect) {
+                          final long position,
+                          final TypedRecord<UnifiedRecordValue> record,
+                          final TypedResponseWriter responseWriter,
+                          final TypedStreamWriter streamWriter,
+                          final Consumer<SideEffectProducer> sideEffect) {
                         streamWriter.appendFollowUpEvent(
                             record.getKey(),
                             WorkflowInstanceIntent.ELEMENT_ACTIVATED,
@@ -298,11 +291,11 @@ public class StreamProcessorReprocessingTest {
                     new TypedRecordProcessor<UnifiedRecordValue>() {
                       @Override
                       public void processRecord(
-                          long position,
-                          TypedRecord<UnifiedRecordValue> record,
-                          TypedResponseWriter responseWriter,
-                          TypedStreamWriter streamWriter,
-                          Consumer<SideEffectProducer> sideEffect) {
+                          final long position,
+                          final TypedRecord<UnifiedRecordValue> record,
+                          final TypedResponseWriter responseWriter,
+                          final TypedStreamWriter streamWriter,
+                          final Consumer<SideEffectProducer> sideEffect) {
                         processLatch.countDown();
                       }
                     }));
@@ -324,18 +317,18 @@ public class StreamProcessorReprocessingTest {
     // given
     final CountDownLatch processingLatch = new CountDownLatch(2);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors.onEvent(
                 ValueType.WORKFLOW_INSTANCE,
                 ELEMENT_ACTIVATING,
                 new TypedRecordProcessor<UnifiedRecordValue>() {
                   @Override
                   public void processRecord(
-                      long position,
-                      TypedRecord<UnifiedRecordValue> record,
-                      TypedResponseWriter responseWriter,
-                      TypedStreamWriter streamWriter,
-                      Consumer<SideEffectProducer> sideEffect) {
+                      final long position,
+                      final TypedRecord<UnifiedRecordValue> record,
+                      final TypedResponseWriter responseWriter,
+                      final TypedStreamWriter streamWriter,
+                      final Consumer<SideEffectProducer> sideEffect) {
                     processingLatch.countDown();
                   }
                 }));
@@ -349,18 +342,18 @@ public class StreamProcessorReprocessingTest {
     final List<Long> processedPositions = new ArrayList<>();
     final CountDownLatch newProcessLatch = new CountDownLatch(1);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors.onEvent(
                 ValueType.WORKFLOW_INSTANCE,
                 ELEMENT_ACTIVATING,
                 new TypedRecordProcessor<UnifiedRecordValue>() {
                   @Override
                   public void processRecord(
-                      long position,
-                      TypedRecord<UnifiedRecordValue> record,
-                      TypedResponseWriter responseWriter,
-                      TypedStreamWriter streamWriter,
-                      Consumer<SideEffectProducer> sideEffect) {
+                      final long position,
+                      final TypedRecord<UnifiedRecordValue> record,
+                      final TypedResponseWriter responseWriter,
+                      final TypedStreamWriter streamWriter,
+                      final Consumer<SideEffectProducer> sideEffect) {
                     processedPositions.add(position);
                     newProcessLatch.countDown();
                   }
@@ -378,18 +371,18 @@ public class StreamProcessorReprocessingTest {
     // given
     final CountDownLatch processingLatch = new CountDownLatch(2);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors.onEvent(
                 ValueType.WORKFLOW_INSTANCE,
                 ELEMENT_ACTIVATING,
                 new TypedRecordProcessor<UnifiedRecordValue>() {
                   @Override
                   public void processRecord(
-                      long position,
-                      TypedRecord<UnifiedRecordValue> record,
-                      TypedResponseWriter responseWriter,
-                      TypedStreamWriter streamWriter,
-                      Consumer<SideEffectProducer> sideEffect) {
+                      final long position,
+                      final TypedRecord<UnifiedRecordValue> record,
+                      final TypedResponseWriter responseWriter,
+                      final TypedStreamWriter streamWriter,
+                      final Consumer<SideEffectProducer> sideEffect) {
                     processingLatch.countDown();
                   }
                 }));
@@ -409,18 +402,18 @@ public class StreamProcessorReprocessingTest {
     final List<Long> processedPositions = new ArrayList<>();
     final CountDownLatch newProcessLatch = new CountDownLatch(2);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors.onEvent(
                 ValueType.WORKFLOW_INSTANCE,
                 ELEMENT_ACTIVATING,
                 new TypedRecordProcessor<UnifiedRecordValue>() {
                   @Override
                   public void processRecord(
-                      long position,
-                      TypedRecord<UnifiedRecordValue> record,
-                      TypedResponseWriter responseWriter,
-                      TypedStreamWriter streamWriter,
-                      Consumer<SideEffectProducer> sideEffect) {
+                      final long position,
+                      final TypedRecord<UnifiedRecordValue> record,
+                      final TypedResponseWriter responseWriter,
+                      final TypedStreamWriter streamWriter,
+                      final Consumer<SideEffectProducer> sideEffect) {
                     processedPositions.add(position);
                     newProcessLatch.countDown();
                   }

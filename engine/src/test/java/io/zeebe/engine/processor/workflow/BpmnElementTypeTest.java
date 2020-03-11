@@ -34,7 +34,7 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
-public class BpmnElementTypeTest {
+public final class BpmnElementTypeTest {
 
   @ClassRule public static final EngineRule ENGINE = EngineRule.singlePartition();
   private static final List<BpmnElementTypeScenario> SCENARIOS =
@@ -84,7 +84,7 @@ public class BpmnElementTypeTest {
                       MessageStartEventSubscriptionIntent.OPENED)
                   .getFirst();
 
-              ENGINE.message().withName(messageName()).withCorrelationKey("").publish();
+              ENGINE.message().withName(messageName()).withCorrelationKey("id").publish();
             }
           },
           new BpmnElementTypeScenario("Timer Start Event", BpmnElementType.START_EVENT) {
@@ -291,7 +291,7 @@ public class BpmnElementTypeTest {
 
   private final BpmnElementTypeScenario scenario;
 
-  public BpmnElementTypeTest(BpmnElementTypeScenario scenario) {
+  public BpmnElementTypeTest(final BpmnElementTypeScenario scenario) {
     this.scenario = scenario;
   }
 
@@ -331,7 +331,7 @@ public class BpmnElementTypeTest {
     private final String taskType = Strings.newRandomValidBpmnId();
     private final String messageName = Strings.newRandomValidBpmnId();
 
-    BpmnElementTypeScenario(String name, BpmnElementType elementType) {
+    BpmnElementTypeScenario(final String name, final BpmnElementType elementType) {
       this.name = name;
       this.elementType = elementType;
     }
@@ -370,7 +370,7 @@ public class BpmnElementTypeTest {
       return ENGINE.workflowInstance().ofBpmnProcessId(processId()).create();
     }
 
-    long executeInstance(Map<String, String> variables) {
+    long executeInstance(final Map<String, String> variables) {
       final String json =
           "{ "
               + variables.entrySet().stream()

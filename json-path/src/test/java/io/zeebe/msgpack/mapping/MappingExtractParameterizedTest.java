@@ -13,7 +13,6 @@ import static io.zeebe.msgpack.mapping.MappingTestUtil.JSON_MAPPER;
 import static io.zeebe.msgpack.mapping.MappingTestUtil.MSGPACK_MAPPER;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.zeebe.msgpack.mapping.Mapping.Type;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -27,7 +26,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 /** Represents a test class to test the extract document functionality with help of mappings. */
 @RunWith(Parameterized.class)
-public class MappingExtractParameterizedTest {
+public final class MappingExtractParameterizedTest {
 
   @Parameter public String sourceVariables;
 
@@ -37,7 +36,7 @@ public class MappingExtractParameterizedTest {
   @Parameter(2)
   public String expectedVariables;
 
-  private MsgPackMergeTool mergeTool = new MsgPackMergeTool(1024);
+  private final MsgPackMergeTool mergeTool = new MsgPackMergeTool(1024);
 
   @Parameters(name = "Test {index}: {0} to {2}")
   public static Iterable<Object[]> parameters() throws Exception {
@@ -110,18 +109,6 @@ public class MappingExtractParameterizedTest {
             // expected result
             "{'newObj':{'test':'value'}}"
           },
-          // zeebe-io/zeebe#297
-          //            {
-          //                // source
-          //                "{'foo':'bar','int':1,'obj':{'test':'ok'},'array':[1,2,3]}",
-          //                // mapping
-          //                createMappings().mapping("$", "$.foo")
-          //                                .mapping("$.obj", "$.foo.int").build(),
-          //                // expected result
-          //
-          // "{'foo':{'foo':'bar','int':{'test':'ok'},'obj':{'test':'ok'},'array':[1,2,3]}}"
-          //
-          //            },
           {
             // source
             "{'a':{'bb':{'value':'x'}}, 'ab':{'b':{'value':'y'}}}}",
@@ -150,22 +137,6 @@ public class MappingExtractParameterizedTest {
             createMapping("foo.bar", "result"),
             // expected result
             "{'result':1}"
-          },
-          {
-            // source
-            "{'key':'val'}",
-            // mapping
-            createMapping("notAKey", "key"),
-            // expected result
-            "{'key':null}"
-          },
-          {
-            // source
-            "{'key':'val'}",
-            // mapping
-            createMapping("notAKey", "arr", Type.COLLECT),
-            // expected result
-            "{'arr':[null]}"
           },
         });
   }

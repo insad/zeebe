@@ -15,17 +15,23 @@ import io.zeebe.protocol.impl.record.value.job.JobRecord;
 import io.zeebe.protocol.record.RejectionType;
 import io.zeebe.protocol.record.intent.JobIntent;
 
-public class FailProcessor implements CommandProcessor<JobRecord> {
-  public static final String NOT_ACTIVATED_JOB_MESSAGE =
-      "Expected to fail activated job with key '%d', but it %s";
+public final class FailProcessor implements CommandProcessor<JobRecord> {
+
+  private static final String JOB_NOT_FOUND_MESSAGE =
+      "Expected to fail job with key '%d', but it does not exist";
+
+  private static final String INVALID_JOB_STATE_MESSAGE =
+      "Expected to fail job with key '%d', but it is in state '%s'";
+
   private final JobState state;
 
-  public FailProcessor(JobState state) {
+  public FailProcessor(final JobState state) {
     this.state = state;
   }
 
   @Override
-  public void onCommand(TypedRecord<JobRecord> command, CommandControl<JobRecord> commandControl) {
+  public boolean onCommand(
+      final TypedRecord<JobRecord> command, final CommandControl<JobRecord> commandControl) {
     final long key = command.getKey();
     final JobState.State jobState = state.getState(key);
 
@@ -36,17 +42,14 @@ public class FailProcessor implements CommandProcessor<JobRecord> {
       state.fail(key, failedJob);
 
       commandControl.accept(JobIntent.FAILED, failedJob);
-    } else if (jobState == State.ACTIVATABLE) {
-      commandControl.reject(
-          RejectionType.INVALID_STATE,
-          String.format(NOT_ACTIVATED_JOB_MESSAGE, key, "must be activated first"));
-    } else if (jobState == State.FAILED) {
-      commandControl.reject(
-          RejectionType.INVALID_STATE,
-          String.format(NOT_ACTIVATED_JOB_MESSAGE, key, "is marked as failed"));
+
+    } else if (jobState == State.NOT_FOUND) {
+      commandControl.reject(RejectionType.NOT_FOUND, String.format(JOB_NOT_FOUND_MESSAGE, key));
+
     } else {
       commandControl.reject(
-          RejectionType.NOT_FOUND, String.format(NOT_ACTIVATED_JOB_MESSAGE, key, "does not exist"));
+          RejectionType.INVALID_STATE, String.format(INVALID_JOB_STATE_MESSAGE, key, jobState));
     }
+    return true;
   }
 }

@@ -10,8 +10,8 @@ package io.zeebe.broker.it.clustering.topology;
 import static io.zeebe.protocol.Protocol.START_PARTITION_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.zeebe.broker.it.GrpcClientRule;
 import io.zeebe.broker.it.clustering.ClusteringRule;
+import io.zeebe.broker.it.util.GrpcClientRule;
 import io.zeebe.client.api.response.BrokerInfo;
 import io.zeebe.client.api.response.PartitionBrokerRole;
 import io.zeebe.client.api.response.PartitionInfo;
@@ -22,7 +22,7 @@ import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.rules.Timeout;
 
-public class TopologyClusterWithoutReplicationTest {
+public final class TopologyClusterWithoutReplicationTest {
 
   private static final Timeout TEST_TIMEOUT = Timeout.seconds(120);
   private static final ClusteringRule CLUSTERING_RULE = new ClusteringRule(3, 1, 3);
@@ -52,7 +52,7 @@ public class TopologyClusterWithoutReplicationTest {
     assertPartitionInTopology(brokers, START_PARTITION_ID + 2);
   }
 
-  private void assertPartitionInTopology(List<BrokerInfo> brokers, int partition) {
+  private void assertPartitionInTopology(final List<BrokerInfo> brokers, final int partition) {
     assertThat(brokers)
         .flatExtracting(BrokerInfo::getPartitions)
         .filteredOn(p -> p.getPartitionId() == partition)
