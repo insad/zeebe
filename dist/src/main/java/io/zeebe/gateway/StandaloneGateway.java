@@ -7,28 +7,42 @@
  */
 package io.zeebe.gateway;
 
+import static java.lang.Runtime.getRuntime;
+
 import io.atomix.cluster.AtomixCluster;
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
+import io.atomix.core.Atomix;
 import io.atomix.utils.net.Address;
 import io.prometheus.client.exporter.HTTPServer;
+import io.prometheus.client.hotspot.DefaultExports;
 import io.zeebe.gateway.impl.broker.BrokerClient;
 import io.zeebe.gateway.impl.broker.BrokerClientImpl;
 import io.zeebe.gateway.impl.configuration.ClusterCfg;
 import io.zeebe.gateway.impl.configuration.GatewayCfg;
-import io.zeebe.util.TomlConfigurationReader;
+import io.zeebe.legacy.tomlconfig.LegacyConfigurationSupport;
+import io.zeebe.legacy.tomlconfig.LegacyConfigurationSupport.Scope;
 import io.zeebe.util.sched.ActorScheduler;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.function.Function;
+import org.apache.logging.log4j.LogManager;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.core.env.Environment;
 
-public class StandaloneGateway {
+@SpringBootApplication
+public class StandaloneGateway implements CommandLineRunner {
+
+  @Autowired GatewayCfg configuration;
+  @Autowired Environment springEnvironment;
 
   private final AtomixCluster atomixCluster;
   private final Gateway gateway;
   private final GatewayCfg gatewayCfg;
   private final ActorScheduler actorScheduler;
 
-  public StandaloneGateway(GatewayCfg gatewayCfg) {
+  public StandaloneGateway(final GatewayCfg gatewayCfg) {
     atomixCluster = createAtomixCluster(gatewayCfg.getCluster());
     actorScheduler = createActorScheduler(gatewayCfg);
     final Function<GatewayCfg, BrokerClient> brokerClientFactory =
@@ -37,9 +51,9 @@ public class StandaloneGateway {
     this.gatewayCfg = gatewayCfg;
   }
 
-  private AtomixCluster createAtomixCluster(ClusterCfg clusterCfg) {
-    final AtomixCluster atomixCluster =
-        AtomixCluster.builder()
+  private AtomixCluster createAtomixCluster(final ClusterCfg clusterCfg) {
+    final var atomix =
+        Atomix.builder()
             .withMemberId(clusterCfg.getMemberId())
             .withAddress(Address.from(clusterCfg.getHost(), clusterCfg.getPort()))
             .withClusterId(clusterCfg.getClusterName())
@@ -49,12 +63,11 @@ public class StandaloneGateway {
                     .build())
             .build();
 
-    atomixCluster.start();
-
-    return atomixCluster;
+    atomix.start();
+    return atomix;
   }
 
-  private ActorScheduler createActorScheduler(GatewayCfg configuration) {
+  private ActorScheduler createActorScheduler(final GatewayCfg configuration) {
     final ActorScheduler actorScheduler =
         ActorScheduler.newActorScheduler()
             .setCpuBoundActorThreadCount(configuration.getThreads().getManagementThreads())
@@ -73,6 +86,7 @@ public class StandaloneGateway {
       monitoringServer =
           new HTTPServer(
               gatewayCfg.getMonitoring().getHost(), gatewayCfg.getMonitoring().getPort());
+      DefaultExports.initialize();
     }
 
     gateway.listenAndServe();
@@ -84,34 +98,29 @@ public class StandaloneGateway {
     }
   }
 
-  public static void main(String args[]) throws Exception {
-    final GatewayCfg gatewayCfg = initConfiguration(args);
+  public static void main(final String[] args) throws Exception {
+    System.setProperty("spring.banner.location", "classpath:/assets/zeebe_gateway_banner.txt");
+
+    getRuntime()
+        .addShutdownHook(
+            new Thread("Gateway close thread") {
+              @Override
+              public void run() {
+                LogManager.shutdown();
+              }
+            });
+
+    final LegacyConfigurationSupport legacyConfigurationSupport =
+        new LegacyConfigurationSupport(Scope.GATEWAY);
+    legacyConfigurationSupport.checkForLegacyTomlConfigurationArgument(args, "broker.cfg.yaml");
+
+    SpringApplication.run(StandaloneGateway.class, args);
+  }
+
+  @Override
+  public void run(final String... args) throws Exception {
+    final GatewayCfg gatewayCfg = configuration;
     gatewayCfg.init();
     new StandaloneGateway(gatewayCfg).run();
-  }
-
-  private static GatewayCfg initConfiguration(String[] args) {
-    if (args.length >= 1) {
-      String configFileLocation = args[0];
-
-      if (!Paths.get(configFileLocation).isAbsolute()) {
-        configFileLocation =
-            Paths.get(getBasePath(), configFileLocation).toAbsolutePath().normalize().toString();
-      }
-
-      return TomlConfigurationReader.read(configFileLocation, GatewayCfg.class);
-    } else {
-      return new GatewayCfg();
-    }
-  }
-
-  private static String getBasePath() {
-    String basePath = System.getProperty("basedir");
-
-    if (basePath == null) {
-      basePath = Paths.get(".").toAbsolutePath().normalize().toString();
-    }
-
-    return basePath;
   }
 }

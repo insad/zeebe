@@ -19,7 +19,7 @@ import org.junit.runner.RunWith;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.StrictStubs.class)
-public class EventOccurredHandlerTest extends ElementHandlerTestCase<ExecutableFlowNode> {
+public final class EventOccurredHandlerTest extends ElementHandlerTestCase<ExecutableFlowNode> {
   private EventOccurredHandler<ExecutableFlowNode> handler;
 
   @Override
@@ -30,7 +30,7 @@ public class EventOccurredHandlerTest extends ElementHandlerTestCase<ExecutableF
   }
 
   @Override
-  protected ElementInstance createAndSetContextElementInstance(WorkflowInstanceIntent state) {
+  protected ElementInstance createAndSetContextElementInstance(final WorkflowInstanceIntent state) {
     final ElementInstance instance = super.createAndSetContextElementInstance(state);
     return instance;
   }
@@ -40,8 +40,8 @@ public class EventOccurredHandlerTest extends ElementHandlerTestCase<ExecutableF
     // given
     final ElementInstance instance =
         createAndSetContextElementInstance(WorkflowInstanceIntent.ELEMENT_ACTIVATED);
-    instance.getValue().setWorkflowInstanceKey(zeebeStateRule.getKeyGenerator().nextKey());
-    zeebeStateRule
+    instance.getValue().setWorkflowInstanceKey(ZEEBE_STATE_RULE.getKeyGenerator().nextKey());
+    ZEEBE_STATE_RULE
         .getZeebeState()
         .getWorkflowState()
         .getElementInstanceState()
@@ -60,23 +60,9 @@ public class EventOccurredHandlerTest extends ElementHandlerTestCase<ExecutableF
     // when - then
     for (final WorkflowInstanceIntent inactiveState : inactiveStates) {
       final ElementInstance instance = createAndSetContextElementInstance(inactiveState);
-      instance.getValue().setWorkflowInstanceKey(zeebeStateRule.getKeyGenerator().nextKey());
+      instance.getValue().setWorkflowInstanceKey(ZEEBE_STATE_RULE.getKeyGenerator().nextKey());
 
       Assertions.assertThat(handler.shouldHandleState(context)).isFalse();
-    }
-  }
-
-  @Test
-  public void shouldHandleStateIfElementHasNoWorkflowInstance() {
-    // given
-    final Set<WorkflowInstanceIntent> inactiveStates =
-        EnumSet.complementOf(EnumSet.of(WorkflowInstanceIntent.ELEMENT_ACTIVATED));
-
-    // when - then
-    for (final WorkflowInstanceIntent inactiveState : inactiveStates) {
-      createAndSetContextElementInstance(inactiveState);
-
-      Assertions.assertThat(handler.shouldHandleState(context)).isTrue();
     }
   }
 

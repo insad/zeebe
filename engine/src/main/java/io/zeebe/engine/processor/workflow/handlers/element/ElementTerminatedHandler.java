@@ -13,7 +13,9 @@ import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableFlo
 import io.zeebe.engine.processor.workflow.handlers.AbstractTerminalStateHandler;
 import io.zeebe.engine.processor.workflow.handlers.IncidentResolver;
 import io.zeebe.engine.state.instance.ElementInstance;
+import io.zeebe.engine.state.instance.IndexedRecord;
 import io.zeebe.protocol.record.intent.WorkflowInstanceIntent;
+import java.util.Optional;
 
 /**
  * Once terminated, consumes its token, and if it is the last active element in its flow scope, will
@@ -25,18 +27,18 @@ public class ElementTerminatedHandler<T extends ExecutableFlowNode>
     extends AbstractTerminalStateHandler<T> {
   private final IncidentResolver incidentResolver;
 
-  public ElementTerminatedHandler(IncidentResolver incidentResolver) {
+  public ElementTerminatedHandler(final IncidentResolver incidentResolver) {
     super();
     this.incidentResolver = incidentResolver;
   }
 
   @Override
-  protected boolean shouldHandleState(BpmnStepContext<T> context) {
+  protected boolean shouldHandleState(final BpmnStepContext<T> context) {
     return super.shouldHandleState(context) && isStateSameAsElementState(context);
   }
 
   @Override
-  protected boolean handleState(BpmnStepContext<T> context) {
+  protected boolean handleState(final BpmnStepContext<T> context) {
     final ElementInstance flowScopeInstance = context.getFlowScopeInstance();
     final boolean isScopeTerminating =
         flowScopeInstance != null
@@ -44,6 +46,7 @@ public class ElementTerminatedHandler<T extends ExecutableFlowNode>
                 flowScopeInstance.getState(), WorkflowInstanceIntent.ELEMENT_TERMINATED);
 
     incidentResolver.resolveIncidents(context);
+
     if (isScopeTerminating && isLastActiveExecutionPathInScope(context)) {
       context
           .getOutput()
@@ -51,8 +54,35 @@ public class ElementTerminatedHandler<T extends ExecutableFlowNode>
               flowScopeInstance.getKey(),
               WorkflowInstanceIntent.ELEMENT_TERMINATED,
               flowScopeInstance.getValue());
+    } else if (wasInterrupted(flowScopeInstance)) {
+      publishInterruptingEventSubproc(context, flowScopeInstance);
     }
 
     return super.handleState(context);
+  }
+
+  private void publishInterruptingEventSubproc(
+      final BpmnStepContext<T> context, final ElementInstance flowScopeInstance) {
+    final Optional<IndexedRecord> eventSubprocOptional =
+        context.getElementInstanceState().getDeferredRecords(flowScopeInstance.getKey()).stream()
+            .filter(r -> r.getKey() == context.getFlowScopeInstance().getInterruptingEventKey())
+            .findFirst();
+
+    if (eventSubprocOptional.isPresent()) {
+      final IndexedRecord eventSubproc = eventSubprocOptional.get();
+
+      eventSubproc.getValue().setFlowScopeKey(flowScopeInstance.getKey());
+      context
+          .getOutput()
+          .appendFollowUpEvent(
+              eventSubproc.getKey(), eventSubproc.getState(), eventSubproc.getValue());
+    }
+  }
+
+  private boolean wasInterrupted(final ElementInstance flowScopeInstance) {
+    return flowScopeInstance != null
+        && flowScopeInstance.getNumberOfActiveTokens() == 2
+        && flowScopeInstance.isInterrupted()
+        && flowScopeInstance.isActive();
   }
 }

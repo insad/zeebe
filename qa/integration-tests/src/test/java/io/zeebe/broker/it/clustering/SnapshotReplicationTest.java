@@ -7,45 +7,54 @@
  */
 package io.zeebe.broker.it.clustering;
 
-import static io.zeebe.test.util.TestUtil.waitUntil;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.zeebe.broker.Broker;
-import io.zeebe.broker.it.DataDeleteTest;
-import io.zeebe.broker.it.GrpcClientRule;
+import io.zeebe.broker.it.clustering.ClusteredDataDeletionTest.TestExporter;
+import io.zeebe.broker.it.util.GrpcClientRule;
+import io.zeebe.broker.system.configuration.BrokerCfg;
+import io.zeebe.broker.system.configuration.DataCfg;
+import io.zeebe.broker.system.configuration.ExporterCfg;
 import io.zeebe.client.ZeebeClient;
-import io.zeebe.engine.Loggers;
 import io.zeebe.model.bpmn.Bpmn;
 import io.zeebe.model.bpmn.BpmnModelInstance;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.CRC32;
+import java.util.zip.CRC32C;
 import java.util.zip.CheckedInputStream;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.RuleChain;
+import org.springframework.util.unit.DataSize;
 
-public class SnapshotReplicationTest {
+public final class SnapshotReplicationTest {
 
   private static final int PARTITION_COUNT = 1;
+  private static final Duration SNAPSHOT_PERIOD = Duration.ofSeconds(30);
+
+  // ensures we do not trigger deletion after replication; if we do, then the followers might open
+  // the database which causes extra files to appear and messes up the checksum counting
+  private static final int MAX_SNAPSHOTS = 2;
 
   private static final BpmnModelInstance WORKFLOW =
       Bpmn.createExecutableProcess("process").startEvent().endEvent().done();
 
   // NOTE: the configuration removes the RecordingExporter from the broker's configuration to enable
   // data deletion so it can't be used in tests
-  public ClusteringRule clusteringRule =
-      new ClusteringRule(PARTITION_COUNT, 3, 3, DataDeleteTest::configureCustomExporter);
-  public GrpcClientRule clientRule = new GrpcClientRule(clusteringRule);
+  public final ClusteringRule clusteringRule =
+      new ClusteringRule(PARTITION_COUNT, 3, 3, SnapshotReplicationTest::configureCustomExporter);
+  public final GrpcClientRule clientRule = new GrpcClientRule(clusteringRule);
 
   @Rule public RuleChain ruleChain = RuleChain.outerRule(clusteringRule).around(clientRule);
 
@@ -64,20 +73,20 @@ public class SnapshotReplicationTest {
     client.newDeployCommand().addWorkflowModel(WORKFLOW, "workflow.bpmn").send().join();
     final int leaderNodeId = clusteringRule.getLeaderForPartition(1).getNodeId();
     final Broker leader = clusteringRule.getBroker(leaderNodeId);
-    clusteringRule.getClock().addTime(Duration.ofSeconds(DataDeleteTest.SNAPSHOT_PERIOD_SECONDS));
+    clusteringRule.getClock().addTime(SNAPSHOT_PERIOD);
 
     // when - snapshot
-    waitForValidSnapshotAtBroker(leader);
+    clusteringRule.waitForValidSnapshotAtBroker(leader);
 
     final List<Broker> otherBrokers = clusteringRule.getOtherBrokerObjects(leaderNodeId);
-    for (Broker broker : otherBrokers) {
-      waitForValidSnapshotAtBroker(broker);
+    for (final Broker broker : otherBrokers) {
+      clusteringRule.waitForValidSnapshotAtBroker(broker);
     }
 
     // then - replicated
     final Collection<Broker> brokers = clusteringRule.getBrokers();
     final Map<Integer, Map<String, Long>> brokerSnapshotChecksums = new HashMap<>();
-    for (Broker broker : brokers) {
+    for (final Broker broker : brokers) {
       final Map<String, Long> checksums = createSnapshotDirectoryChecksums(broker);
       brokerSnapshotChecksums.put(broker.getConfig().getCluster().getNodeId(), checksums);
     }
@@ -87,8 +96,8 @@ public class SnapshotReplicationTest {
     assertThat(checksumFirstNode).isEqualTo(brokerSnapshotChecksums.get(2));
   }
 
-  private Map<String, Long> createSnapshotDirectoryChecksums(Broker broker) {
-    final File snapshotsDir = getSnapshotsDirectory(broker);
+  private Map<String, Long> createSnapshotDirectoryChecksums(final Broker broker) {
+    final File snapshotsDir = clusteringRule.getSnapshotsDirectory(broker);
 
     final Map<String, Long> checksums = createChecksumsForSnapshotDirectory(snapshotsDir);
 
@@ -96,7 +105,7 @@ public class SnapshotReplicationTest {
     return checksums;
   }
 
-  private Map<String, Long> createChecksumsForSnapshotDirectory(File snapshotDirectory) {
+  private Map<String, Long> createChecksumsForSnapshotDirectory(final File snapshotDirectory) {
     final Map<String, Long> checksums = new HashMap<>();
     final File[] snapshotDirs = snapshotDirectory.listFiles();
     if (snapshotDirs != null) {
@@ -106,11 +115,8 @@ public class SnapshotReplicationTest {
               validSnapshotDir -> {
                 final File[] snapshotFiles = validSnapshotDir.listFiles();
                 if (snapshotFiles != null) {
-                  for (File snapshotFile : snapshotFiles) {
+                  for (final File snapshotFile : snapshotFiles) {
                     final long checksum = createCheckSumForFile(snapshotFile);
-
-                    Loggers.STREAM_PROCESSING.debug(
-                        "Created checksum {} for file {}", checksum, snapshotFile);
                     checksums.put(snapshotFile.getName(), checksum);
                   }
                 }
@@ -120,26 +126,29 @@ public class SnapshotReplicationTest {
     return checksums;
   }
 
-  private long createCheckSumForFile(File snapshotFile) {
-    try (CheckedInputStream checkedInputStream =
-        new CheckedInputStream(Files.newInputStream(snapshotFile.toPath()), new CRC32())) {
+  private long createCheckSumForFile(final File snapshotFile) {
+    try (final CheckedInputStream checkedInputStream =
+        new CheckedInputStream(Files.newInputStream(snapshotFile.toPath()), new CRC32C())) {
       while (checkedInputStream.skip(512) > 0) {}
 
       return checkedInputStream.getChecksum().getValue();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
     }
   }
 
-  private File getSnapshotsDirectory(Broker broker) {
-    final String dataDir = broker.getConfig().getData().getDirectories().get(0);
-    return new File(dataDir, "partition-1/state/snapshots");
-  }
+  private static void configureCustomExporter(final BrokerCfg brokerCfg) {
+    final DataCfg data = brokerCfg.getData();
+    data.setMaxSnapshots(MAX_SNAPSHOTS);
+    data.setSnapshotPeriod(SNAPSHOT_PERIOD);
+    data.setLogSegmentSize(DataSize.ofKilobytes(8));
+    brokerCfg.getNetwork().setMaxMessageSize(DataSize.ofKilobytes(8));
 
-  protected void waitForValidSnapshotAtBroker(Broker broker) {
-    final File snapshotsDir = getSnapshotsDirectory(broker);
+    final ExporterCfg exporterCfg = new ExporterCfg();
+    exporterCfg.setClassName(TestExporter.class.getName());
 
-    waitUntil(
-        () -> Arrays.stream(snapshotsDir.listFiles()).anyMatch(f -> !f.getName().contains("tmp")));
+    // overwrites RecordingExporter on purpose because since it doesn't update its position
+    // we wouldn't be able to delete data
+    brokerCfg.setExporters(Collections.singletonMap("data-delete-test-exporter", exporterCfg));
   }
 }

@@ -10,8 +10,7 @@ package io.zeebe.broker.engine.impl;
 import io.atomix.cluster.MemberId;
 import io.atomix.core.Atomix;
 import io.zeebe.broker.Loggers;
-import io.zeebe.broker.clustering.base.topology.NodeInfo;
-import io.zeebe.broker.clustering.base.topology.TopologyPartitionListenerImpl;
+import io.zeebe.broker.clustering.topology.TopologyPartitionListenerImpl;
 import io.zeebe.broker.system.configuration.ClusterCfg;
 import io.zeebe.broker.system.management.deployment.PushDeploymentRequest;
 import io.zeebe.broker.system.management.deployment.PushDeploymentResponse;
@@ -32,13 +31,13 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.agrona.DirectBuffer;
-import org.agrona.collections.Int2ObjectHashMap;
+import org.agrona.collections.Int2IntHashMap;
 import org.agrona.collections.IntArrayList;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.slf4j.Logger;
 
-public class DeploymentDistributorImpl implements DeploymentDistributor {
+public final class DeploymentDistributorImpl implements DeploymentDistributor {
 
   public static final Duration PUSH_REQUEST_TIMEOUT = Duration.ofSeconds(15);
   public static final Duration RETRY_DELAY = Duration.ofMillis(100);
@@ -126,7 +125,7 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
   }
 
   private void prepareToDistribute(
-      IntArrayList partitionsToDistributeTo, final PushDeploymentRequest pushRequest) {
+      final IntArrayList partitionsToDistributeTo, final PushDeploymentRequest pushRequest) {
     actor.runDelayed(
         PUSH_REQUEST_TIMEOUT,
         () -> {
@@ -152,7 +151,7 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
         distributeDeploymentToPartitions(partitionsToDistribute, pushRequest);
 
     if (remainingPartitions.isEmpty()) {
-      LOG.trace("Pushed deployment {} to all partitions.", pushRequest.deploymentKey());
+      LOG.debug("Pushed deployment {} to all partitions.", pushRequest.deploymentKey());
       return;
     }
 
@@ -161,16 +160,15 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
 
   private IntArrayList distributeDeploymentToPartitions(
       final IntArrayList remainingPartitions, final PushDeploymentRequest pushRequest) {
-    final Int2ObjectHashMap<NodeInfo> currentPartitionLeaders =
-        partitionListener.getPartitionLeaders();
+    final Int2IntHashMap currentPartitionLeaders = partitionListener.getPartitionLeaders();
 
     final Iterator<Integer> iterator = remainingPartitions.iterator();
     while (iterator.hasNext()) {
       final Integer partitionId = iterator.next();
-      final NodeInfo leader = currentPartitionLeaders.get(partitionId);
-      if (leader != null) {
+      if (currentPartitionLeaders.containsKey(partitionId)) {
+        final int leader = currentPartitionLeaders.get(partitionId);
         iterator.remove();
-        pushDeploymentToPartition(leader.getNodeId(), partitionId, pushRequest);
+        pushDeploymentToPartition(leader, partitionId, pushRequest);
       }
     }
     return remainingPartitions;
@@ -238,7 +236,7 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
                 final CompletableFuture future = new CompletableFuture();
                 actor.call(
                     () -> {
-                      LOG.debug("Receiving deployment response on topic {}", topic);
+                      LOG.trace("Receiving deployment response on topic {}", topic);
 
                       handleResponse(response, deploymentKey, topic);
                       future.complete(null);
@@ -249,7 +247,7 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
     }
   }
 
-  private void handleResponse(byte[] response, final long deploymentKey, String topic) {
+  private void handleResponse(final byte[] response, final long deploymentKey, final String topic) {
     final DirectBuffer responseBuffer = new UnsafeBuffer(response);
 
     if (pushDeploymentResponse.tryWrap(responseBuffer)) {
@@ -270,17 +268,15 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
   }
 
   private void handleRetry(
-      int partitionLeaderId, int partition, final PushDeploymentRequest pushRequest) {
-    LOG.debug("Retry deployment push to partition {} after {}", partition, RETRY_DELAY);
+      final int partitionLeaderId, final int partition, final PushDeploymentRequest pushRequest) {
+    LOG.trace("Retry deployment push to partition {} after {}", partition, RETRY_DELAY);
 
     actor.runDelayed(
         RETRY_DELAY,
         () -> {
-          final Int2ObjectHashMap<NodeInfo> partitionLeaders =
-              partitionListener.getPartitionLeaders();
-          final NodeInfo currentLeader = partitionLeaders.get(partition);
-          if (currentLeader != null) {
-            pushDeploymentToPartition(currentLeader.getNodeId(), partition, pushRequest);
+          final Int2IntHashMap partitionLeaders = partitionListener.getPartitionLeaders();
+          if (partitionLeaders.containsKey(partition)) {
+            pushDeploymentToPartition(partitionLeaders.get(partition), partition, pushRequest);
           } else {
             pushDeploymentToPartition(partitionLeaderId, partition, pushRequest);
           }
@@ -303,7 +299,7 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
           pushDeploymentResponse.partitionId());
 
       if (remainingPartitions == 0) {
-        LOG.debug("Deployment {} pushed to all partitions successfully.", deploymentKey);
+        LOG.debug("Deployment {} distributed to all partitions successfully.", deploymentKey);
         pendingDeploymentFutures.remove(deploymentKey).complete(null);
       }
     } else {

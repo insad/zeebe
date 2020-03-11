@@ -7,13 +7,13 @@
  */
 package io.zeebe.gateway.api.deployment;
 
-import io.zeebe.gateway.api.util.StubbedGateway;
-import io.zeebe.gateway.api.util.StubbedGateway.RequestStub;
+import io.zeebe.gateway.api.util.StubbedBrokerClient;
+import io.zeebe.gateway.api.util.StubbedBrokerClient.RequestStub;
 import io.zeebe.gateway.impl.broker.request.BrokerDeployWorkflowRequest;
 import io.zeebe.gateway.impl.broker.response.BrokerResponse;
 import io.zeebe.protocol.impl.record.value.deployment.DeploymentRecord;
 
-public class DeployWorkflowStub
+public final class DeployWorkflowStub
     implements RequestStub<BrokerDeployWorkflowRequest, BrokerResponse<DeploymentRecord>> {
 
   private static final long KEY = 123;
@@ -21,7 +21,7 @@ public class DeployWorkflowStub
   private static final int WORKFLOW_VERSION = 789;
 
   @Override
-  public void registerWith(StubbedGateway gateway) {
+  public void registerWith(final StubbedBrokerClient gateway) {
     gateway.registerHandler(BrokerDeployWorkflowRequest.class, this);
   }
 
@@ -38,7 +38,7 @@ public class DeployWorkflowStub
   }
 
   @Override
-  public BrokerResponse<DeploymentRecord> handle(BrokerDeployWorkflowRequest request)
+  public BrokerResponse<DeploymentRecord> handle(final BrokerDeployWorkflowRequest request)
       throws Exception {
     final DeploymentRecord deploymentRecord = request.getRequestWriter();
     deploymentRecord

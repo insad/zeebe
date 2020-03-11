@@ -19,12 +19,13 @@ import java.time.Duration;
 import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 
-public class LongPollingActivateJobsRequest {
+public final class LongPollingActivateJobsRequest {
 
   private static final Logger LOG = Loggers.GATEWAY_LOGGER;
   private final BrokerActivateJobsRequest request;
   private final StreamObserver<ActivateJobsResponse> responseObserver;
   private final String jobType;
+  private final String worker;
   private final int maxJobsToActivate;
   private final Duration longPollingTimeout;
 
@@ -34,35 +35,39 @@ public class LongPollingActivateJobsRequest {
   private BooleanSupplier cancelCheck = () -> false;
 
   public LongPollingActivateJobsRequest(
-      ActivateJobsRequest request, StreamObserver<ActivateJobsResponse> responseObserver) {
+      final ActivateJobsRequest request,
+      final StreamObserver<ActivateJobsResponse> responseObserver) {
     this(
         RequestMapper.toActivateJobsRequest(request),
         responseObserver,
         request.getType(),
+        request.getWorker(),
         request.getMaxJobsToActivate(),
         request.getRequestTimeout());
   }
 
   private LongPollingActivateJobsRequest(
-      BrokerActivateJobsRequest request,
-      StreamObserver<ActivateJobsResponse> responseObserver,
-      String jobType,
-      int maxJobstoActivate,
-      long longPollingTimeout) {
+      final BrokerActivateJobsRequest request,
+      final StreamObserver<ActivateJobsResponse> responseObserver,
+      final String jobType,
+      final String worker,
+      final int maxJobstoActivate,
+      final long longPollingTimeout) {
     this.request = request;
     this.responseObserver = responseObserver;
 
     if (responseObserver instanceof ServerCallStreamObserver) {
-      cancelCheck = () -> ((ServerCallStreamObserver) responseObserver).isCancelled();
+      cancelCheck = ((ServerCallStreamObserver) responseObserver)::isCancelled;
     }
     this.jobType = jobType;
+    this.worker = worker;
     this.maxJobsToActivate = maxJobstoActivate;
     this.longPollingTimeout =
         longPollingTimeout == 0 ? null : Duration.ofMillis(longPollingTimeout);
   }
 
   public void complete() {
-    if (isCompleted()) {
+    if (isCompleted() || isCanceled()) {
       return;
     }
     if (scheduledTimer != null) {
@@ -70,7 +75,7 @@ public class LongPollingActivateJobsRequest {
     }
     try {
       responseObserver.onCompleted();
-    } catch (Exception e) {
+    } catch (final Exception e) {
       LOG.warn("Failed to complete {}", request, e);
     }
     this.isCompleted = true;
@@ -80,12 +85,12 @@ public class LongPollingActivateJobsRequest {
     return this.isCompleted;
   }
 
-  public void onResponse(ActivateJobsResponse grpcResponse) {
-    if (!isCompleted) {
+  public void onResponse(final ActivateJobsResponse grpcResponse) {
+    if (!(isCompleted() || isCanceled())) {
       try {
         responseObserver.onNext(grpcResponse);
-      } catch (Exception e) {
-        LOG.warn("Failed to send response {}", grpcResponse, e);
+      } catch (final Exception e) {
+        LOG.warn("Failed to send response to client.", e);
       }
     }
   }
@@ -111,11 +116,15 @@ public class LongPollingActivateJobsRequest {
     return jobType;
   }
 
+  public String getWorker() {
+    return worker;
+  }
+
   public int getMaxJobsToActivate() {
     return maxJobsToActivate;
   }
 
-  public void setScheduledTimer(ScheduledTimer scheduledTimer) {
+  public void setScheduledTimer(final ScheduledTimer scheduledTimer) {
     this.scheduledTimer = scheduledTimer;
   }
 
@@ -127,7 +136,7 @@ public class LongPollingActivateJobsRequest {
     return isTimedOut;
   }
 
-  public Duration getLongPollingTimeout(Duration defaultTimeout) {
+  public Duration getLongPollingTimeout(final Duration defaultTimeout) {
     if (longPollingTimeout == null) {
       return defaultTimeout;
     }

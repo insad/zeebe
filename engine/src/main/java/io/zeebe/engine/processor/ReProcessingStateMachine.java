@@ -14,13 +14,10 @@ import io.zeebe.engine.state.ZeebeState;
 import io.zeebe.logstreams.impl.Loggers;
 import io.zeebe.logstreams.log.LogStreamReader;
 import io.zeebe.logstreams.log.LoggedEvent;
-import io.zeebe.msgpack.UnpackedObject;
 import io.zeebe.protocol.impl.record.RecordMetadata;
 import io.zeebe.protocol.impl.record.UnifiedRecordValue;
 import io.zeebe.protocol.impl.record.value.error.ErrorRecord;
-import io.zeebe.protocol.record.RejectionType;
 import io.zeebe.protocol.record.ValueType;
-import io.zeebe.protocol.record.intent.Intent;
 import io.zeebe.util.retry.EndlessRetryStrategy;
 import io.zeebe.util.retry.RetryStrategy;
 import io.zeebe.util.sched.ActorControl;
@@ -94,7 +91,7 @@ public final class ReProcessingStateMachine {
 
   private final EventFilter eventFilter;
   private final LogStreamReader logStreamReader;
-  private final TypedStreamWriter noopstreamWriter = new NoopStreamWriter();
+  private final TypedStreamWriter noopstreamWriter = new NoopTypedStreamWriter();
   private final TypedResponseWriter noopResponseWriter = new NoopResponseWriter();
 
   private final DbContext dbContext;
@@ -110,7 +107,7 @@ public final class ReProcessingStateMachine {
   private TypedRecordProcessor eventProcessor;
   private ZeebeDbTransaction zeebeDbTransaction;
 
-  public ReProcessingStateMachine(ProcessingContext context) {
+  public ReProcessingStateMachine(final ProcessingContext context) {
     this.actor = context.getActor();
     this.eventFilter = context.getEventFilter();
     this.logStreamReader = context.getLogStreamReader();
@@ -237,7 +234,7 @@ public final class ReProcessingStateMachine {
     processUntilDone(currentEvent.getPosition(), typedEvent);
   }
 
-  private void processUntilDone(long position, TypedRecord<?> currentEvent) {
+  private void processUntilDone(final long position, final TypedRecord<?> currentEvent) {
     final TransactionOperation operationOnProcessing =
         chooseOperationForEvent(position, currentEvent);
 
@@ -263,7 +260,8 @@ public final class ReProcessingStateMachine {
         });
   }
 
-  private TransactionOperation chooseOperationForEvent(long position, TypedRecord<?> currentEvent) {
+  private TransactionOperation chooseOperationForEvent(
+      final long position, final TypedRecord<?> currentEvent) {
     final TransactionOperation operationOnProcessing;
     if (failedEventPositions.contains(position)) {
       LOG.info(LOG_STMT_FAILED_ON_PROCESSING, currentEvent);
@@ -317,69 +315,5 @@ public final class ReProcessingStateMachine {
   private void onRecovered() {
     recoveryFuture.complete(null);
     failedEventPositions.clear();
-  }
-
-  private static final class NoopStreamWriter implements TypedStreamWriter {
-
-    @Override
-    public void appendRejection(
-        TypedRecord<? extends UnpackedObject> command, RejectionType type, String reason) {}
-
-    @Override
-    public void appendRejection(
-        TypedRecord<? extends UnpackedObject> command,
-        RejectionType type,
-        String reason,
-        Consumer<RecordMetadata> metadata) {}
-
-    @Override
-    public void appendNewEvent(long key, Intent intent, UnpackedObject value) {}
-
-    @Override
-    public void appendFollowUpEvent(long key, Intent intent, UnpackedObject value) {}
-
-    @Override
-    public void appendFollowUpEvent(
-        long key, Intent intent, UnpackedObject value, Consumer<RecordMetadata> metadata) {}
-
-    @Override
-    public void configureSourceContext(long sourceRecordPosition) {}
-
-    @Override
-    public void appendNewCommand(Intent intent, UnpackedObject value) {}
-
-    @Override
-    public void appendFollowUpCommand(long key, Intent intent, UnpackedObject value) {}
-
-    @Override
-    public void appendFollowUpCommand(
-        long key, Intent intent, UnpackedObject value, Consumer<RecordMetadata> metadata) {}
-
-    @Override
-    public void reset() {}
-
-    @Override
-    public long flush() {
-      return 0;
-    }
-  }
-
-  private static final class NoopResponseWriter implements TypedResponseWriter {
-
-    @Override
-    public void writeRejectionOnCommand(
-        TypedRecord<?> command, RejectionType type, String reason) {}
-
-    @Override
-    public void writeEvent(TypedRecord<?> event) {}
-
-    @Override
-    public void writeEventOnCommand(
-        long eventKey, Intent eventState, UnpackedObject eventValue, TypedRecord<?> command) {}
-
-    @Override
-    public boolean flush() {
-      return false;
-    }
   }
 }

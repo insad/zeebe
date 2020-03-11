@@ -16,7 +16,7 @@ import io.zeebe.engine.state.instance.ElementInstance;
 import io.zeebe.engine.state.instance.WorkflowEngineState;
 import io.zeebe.protocol.impl.record.value.workflowinstance.WorkflowInstanceRecord;
 
-public class WorkflowInstanceCommandProcessor
+public final class WorkflowInstanceCommandProcessor
     implements TypedRecordProcessor<WorkflowInstanceRecord> {
 
   private final WorkflowInstanceCommandHandlers commandHandlers;
@@ -24,26 +24,26 @@ public class WorkflowInstanceCommandProcessor
   private final WorkflowInstanceCommandContext context;
 
   public WorkflowInstanceCommandProcessor(
-      WorkflowEngineState state, final KeyGenerator keyGenerator) {
+      final WorkflowEngineState state, final KeyGenerator keyGenerator) {
     this.state = state;
-    this.commandHandlers = new WorkflowInstanceCommandHandlers();
+    commandHandlers = new WorkflowInstanceCommandHandlers();
     final EventOutput output = new EventOutput(state, keyGenerator);
-    this.context = new WorkflowInstanceCommandContext(output);
+    context = new WorkflowInstanceCommandContext(output, state.getElementInstanceState());
   }
 
   @Override
   public void processRecord(
-      TypedRecord<WorkflowInstanceRecord> record,
-      TypedResponseWriter responseWriter,
-      TypedStreamWriter streamWriter) {
+      final TypedRecord<WorkflowInstanceRecord> record,
+      final TypedResponseWriter responseWriter,
+      final TypedStreamWriter streamWriter) {
     populateCommandContext(record, responseWriter, streamWriter);
     commandHandlers.handle(context);
   }
 
   private void populateCommandContext(
-      TypedRecord<WorkflowInstanceRecord> record,
-      TypedResponseWriter responseWriter,
-      TypedStreamWriter streamWriter) {
+      final TypedRecord<WorkflowInstanceRecord> record,
+      final TypedResponseWriter responseWriter,
+      final TypedStreamWriter streamWriter) {
     context.setRecord(record);
     context.setResponseWriter(responseWriter);
     context.setStreamWriter(streamWriter);

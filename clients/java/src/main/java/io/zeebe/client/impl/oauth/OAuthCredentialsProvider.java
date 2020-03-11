@@ -22,7 +22,7 @@ import com.google.common.io.CharStreams;
 import io.grpc.Metadata;
 import io.grpc.Metadata.Key;
 import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
+import io.grpc.Status.Code;
 import io.zeebe.client.CredentialsProvider;
 import io.zeebe.client.impl.ZeebeClientCredentials;
 import java.io.IOException;
@@ -39,7 +39,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class OAuthCredentialsProvider implements CredentialsProvider {
+public final class OAuthCredentialsProvider implements CredentialsProvider {
   private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
   private static final ObjectReader CREDENTIALS_READER =
       JSON_MAPPER.readerFor(ZeebeClientCredentials.class);
@@ -57,35 +57,34 @@ public class OAuthCredentialsProvider implements CredentialsProvider {
   OAuthCredentialsProvider(final OAuthCredentialsProviderBuilder builder) {
     authorizationServerUrl = builder.getAuthorizationServer();
     endpoint = builder.getAudience();
-    jsonPayload = createJsonPayload(builder);
+    try {
+      jsonPayload = createJsonPayload(builder);
+    } catch (JsonProcessingException e) {
+      throw new UncheckedIOException(e);
+    }
     credentialsCache = new OAuthCredentialsCache(builder.getCredentialsCache());
   }
 
   /** Adds an access token to the Authorization header of a gRPC call. */
   @Override
-  public void applyCredentials(final Metadata headers) {
-    try {
-      if (credentials == null) {
-        loadCredentials();
-      }
-
-      headers.put(
-          HEADER_AUTH_KEY,
-          String.format("%s %s", credentials.getTokenType(), credentials.getAccessToken()));
-    } catch (final IOException e) {
-      LOG.warn("Failed while fetching credentials, will not add credentials to rpc: ", e);
+  public void applyCredentials(final Metadata headers) throws IOException {
+    if (credentials == null) {
+      loadCredentials();
     }
+
+    headers.put(
+        HEADER_AUTH_KEY,
+        String.format("%s %s", credentials.getTokenType(), credentials.getAccessToken()));
   }
 
   /**
-   * @return true if the Throwable was caused by an UNAUTHENTICATED response and a new access token
-   *     could be fetched; otherwise returns false.
+   * Returns true if the Throwable was caused by an UNAUTHENTICATED response and a new access token
+   * could be fetched; otherwise returns false.
    */
   @Override
   public boolean shouldRetryRequest(final Throwable throwable) {
     try {
-      return throwable instanceof StatusRuntimeException
-          && ((StatusRuntimeException) throwable).getStatus() == Status.UNAUTHENTICATED
+      return Status.fromThrowable(throwable).getCode() == Code.UNAUTHENTICATED
           && refreshCredentials();
     } catch (final IOException e) {
       LOG.error("Failed while fetching credentials: ", e);
@@ -130,18 +129,15 @@ public class OAuthCredentialsProvider implements CredentialsProvider {
     return true;
   }
 
-  private static String createJsonPayload(final OAuthCredentialsProviderBuilder builder) {
-    try {
-      final Map<String, String> payload = new HashMap<>();
-      payload.put("client_id", builder.getClientId());
-      payload.put("client_secret", builder.getClientSecret());
-      payload.put("audience", builder.getAudience());
-      payload.put("grant_type", "client_credentials");
+  private static String createJsonPayload(final OAuthCredentialsProviderBuilder builder)
+      throws JsonProcessingException {
+    final Map<String, String> payload = new HashMap<>();
+    payload.put("client_id", builder.getClientId());
+    payload.put("client_secret", builder.getClientSecret());
+    payload.put("audience", builder.getAudience());
+    payload.put("grant_type", "client_credentials");
 
-      return JSON_MAPPER.writeValueAsString(payload);
-    } catch (final JsonProcessingException e) {
-      throw new UncheckedIOException(e);
-    }
+    return JSON_MAPPER.writeValueAsString(payload);
   }
 
   private ZeebeClientCredentials fetchCredentials() throws IOException {
@@ -152,7 +148,7 @@ public class OAuthCredentialsProvider implements CredentialsProvider {
     connection.setRequestProperty("Accept", "application/json");
     connection.setDoOutput(true);
 
-    try (OutputStream os = connection.getOutputStream()) {
+    try (final OutputStream os = connection.getOutputStream()) {
       final byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
       os.write(input, 0, input.length);
     }
@@ -164,8 +160,8 @@ public class OAuthCredentialsProvider implements CredentialsProvider {
               connection.getResponseCode(), connection.getResponseMessage()));
     }
 
-    try (InputStream in = connection.getInputStream();
-        InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+    try (final InputStream in = connection.getInputStream();
+        final InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
 
       final ZeebeClientCredentials fetchedCredentials =
           CREDENTIALS_READER.readValue(CharStreams.toString(reader));

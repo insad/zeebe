@@ -24,7 +24,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 /** Represents a test class to test the merge documents functionality with help of mappings. */
 @RunWith(Parameterized.class)
-public class MappingMergeParameterizedTest {
+public final class MappingMergeParameterizedTest {
   @Parameter public String sourcePayload;
 
   @Parameter(1)
@@ -36,7 +36,7 @@ public class MappingMergeParameterizedTest {
   @Parameter(3)
   public String expectedPayload;
 
-  private MsgPackMergeTool mergeTool = new MsgPackMergeTool(1024);
+  private final MsgPackMergeTool mergeTool = new MsgPackMergeTool(1024);
 
   @Parameters(name = "Test {index}: merge {0} and {1} to {3}")
   public static Iterable<Object[]> parameters() throws Exception {
@@ -322,25 +322,6 @@ public class MappingMergeParameterizedTest {
             // expected result
             "{'obj':{'test':'value','newFoo':1},'int':1}"
           },
-          // 37. Test zeebe-io/zeebe#297
-          //                                            {
-          //                                                    // source
-          //
-          // "{'foo':'bar','int':1,'obj':{'test':'ok'},'array':[1,2,3]}",
-          //                                                // target
-          //                                                "{}",
-          //                                                    // mapping
-          //                                                    createMappings()
-          //                                                            .mapping("$", "$.foo")
-          //                                                            .mapping("$.obj",
-          // "$.foo.int")
-          //                                                            .build(),
-          //                                                    // expected result
-          //
-          // "{'foo':{'foo':'bar','int':{'test':'ok'},'obj':{'test':'ok'},'array':[1,2,3]}}"
-          //
-          //
-          // 42.Test
           {
             // source
             "{'a':{'bb':{'value':'x'}}, 'ab':{'b':{'value':'y'}}}}",

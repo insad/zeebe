@@ -29,21 +29,23 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 
-public class ExporterManagerTest {
+public final class ExporterManagerTest {
 
   private static final BpmnModelInstance WORKFLOW =
       Bpmn.createExecutableProcess("process").startEvent().done();
-  public ExporterCfg exporterCfg;
-  public EmbeddedBrokerRule brokerRule =
+
+  private static final String TEST_EXPORTER_ID = "test-exporter";
+
+  private ExporterCfg exporterCfg;
+  private final EmbeddedBrokerRule brokerRule =
       new EmbeddedBrokerRule(
           brokerCfg -> {
             exporterCfg = new ExporterCfg();
             exporterCfg.setClassName(TestExporter.class.getName());
-            exporterCfg.setId("test-exporter");
 
-            brokerCfg.getExporters().add(exporterCfg);
+            brokerCfg.getExporters().put(TEST_EXPORTER_ID, exporterCfg);
           });
-  public CommandApiRule clientRule = new CommandApiRule(brokerRule::getAtomix);
+  public final CommandApiRule clientRule = new CommandApiRule(brokerRule::getAtomix);
   @Rule public RuleChain ruleChain = RuleChain.outerRule(brokerRule).around(clientRule);
   private PartitionTestClient testClient;
 
@@ -51,7 +53,7 @@ public class ExporterManagerTest {
   public void init() {
     testClient = clientRule.partitionClient();
 
-    TestExporter.records.clear();
+    TestExporter.RECORDS.clear();
   }
 
   @Test
@@ -62,14 +64,14 @@ public class ExporterManagerTest {
     waitUntil(() -> isDeploymentExported(deploymentKey1));
 
     // when
-    TestExporter.records.clear();
+    TestExporter.RECORDS.clear();
     brokerRule.restartBroker();
 
     // then
     final long deploymentKey2 = testClient.deploy(WORKFLOW);
     waitUntil(() -> isDeploymentExported(deploymentKey2));
 
-    assertThat(TestExporter.records).extracting(Record::getKey).doesNotContain(deploymentKey1);
+    assertThat(TestExporter.RECORDS).extracting(Record::getKey).doesNotContain(deploymentKey1);
   }
 
   @Test
@@ -87,33 +89,33 @@ public class ExporterManagerTest {
     // (https://github.com/zeebe-io/zeebe/issues/2490)
     testClient.publishMessage("msg", "123", DocumentValue.EMPTY_DOCUMENT).getKey();
 
-    TestExporter.records.clear();
-    brokerRule.getBrokerCfg().getExporters().add(exporterCfg);
+    TestExporter.RECORDS.clear();
+    brokerRule.getBrokerCfg().getExporters().put(TEST_EXPORTER_ID, exporterCfg);
     brokerRule.restartBroker();
 
     // then
     final long deploymentKey2 = testClient.deploy(WORKFLOW);
     waitUntil(() -> isDeploymentExported(deploymentKey2));
 
-    assertThat(TestExporter.records)
+    assertThat(TestExporter.RECORDS)
         .extracting(Record::getKey)
         .contains(deploymentKey1, deploymentKey2);
   }
 
-  private boolean isDeploymentExported(long deploymentKey1) {
-    return TestExporter.records.stream()
+  private boolean isDeploymentExported(final long deploymentKey1) {
+    return TestExporter.RECORDS.stream()
         .anyMatch(
             r -> r.getKey() == deploymentKey1 && r.getIntent() == DeploymentIntent.DISTRIBUTED);
   }
 
   public static class TestExporter extends DebugLogExporter {
 
-    public static List<Record> records = new CopyOnWriteArrayList<>();
+    static final List<Record> RECORDS = new CopyOnWriteArrayList<>();
 
     private Controller controller;
 
     @Override
-    public void open(Controller controller) {
+    public void open(final Controller controller) {
       this.controller = controller;
     }
 
@@ -121,7 +123,7 @@ public class ExporterManagerTest {
     public void export(final Record record) {
       controller.updateLastExportedRecordPosition(record.getPosition());
 
-      records.add(record);
+      RECORDS.add(record.clone());
     }
   }
 }

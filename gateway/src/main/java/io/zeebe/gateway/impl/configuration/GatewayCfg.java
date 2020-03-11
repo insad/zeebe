@@ -8,9 +8,12 @@
 package io.zeebe.gateway.impl.configuration;
 
 import com.google.gson.GsonBuilder;
-import io.zeebe.util.Environment;
 import java.util.Objects;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
 
+@Component
+@ConfigurationProperties(prefix = "zeebe.gateway")
 public class GatewayCfg {
 
   private NetworkCfg network = new NetworkCfg();
@@ -20,26 +23,18 @@ public class GatewayCfg {
   private SecurityCfg security = new SecurityCfg();
 
   public void init() {
-    init(new Environment());
+    network.init(ConfigurationDefaults.DEFAULT_HOST);
   }
 
-  public void init(Environment environment) {
-    init(environment, ConfigurationDefaults.DEFAULT_HOST);
-  }
-
-  public void init(Environment environment, String defaultHost) {
-    network.init(environment, defaultHost);
-    cluster.init(environment);
-    threads.init(environment);
-    monitoring.init(environment, defaultHost);
-    security.init(environment);
+  public void init(final String defaultHost) {
+    network.init(defaultHost);
   }
 
   public NetworkCfg getNetwork() {
     return network;
   }
 
-  public GatewayCfg setNetwork(NetworkCfg network) {
+  public GatewayCfg setNetwork(final NetworkCfg network) {
     this.network = network;
     return this;
   }
@@ -48,7 +43,7 @@ public class GatewayCfg {
     return cluster;
   }
 
-  public GatewayCfg setCluster(ClusterCfg cluster) {
+  public GatewayCfg setCluster(final ClusterCfg cluster) {
     this.cluster = cluster;
     return this;
   }
@@ -57,7 +52,7 @@ public class GatewayCfg {
     return threads;
   }
 
-  public GatewayCfg setThreads(ThreadsCfg threads) {
+  public GatewayCfg setThreads(final ThreadsCfg threads) {
     this.threads = threads;
     return this;
   }
@@ -66,7 +61,7 @@ public class GatewayCfg {
     return monitoring;
   }
 
-  public GatewayCfg setMonitoring(MonitoringCfg monitoring) {
+  public GatewayCfg setMonitoring(final MonitoringCfg monitoring) {
     this.monitoring = monitoring;
     return this;
   }
@@ -86,7 +81,7 @@ public class GatewayCfg {
   }
 
   @Override
-  public boolean equals(Object o) {
+  public boolean equals(final Object o) {
     if (this == o) {
       return true;
     }

@@ -8,31 +8,34 @@
 package io.zeebe.logstreams.spi;
 
 import io.zeebe.db.ZeebeDb;
-import io.zeebe.distributedlog.restore.snapshot.SnapshotRestoreInfo;
+import io.zeebe.logstreams.state.Snapshot;
 import java.io.File;
 import java.io.IOException;
 import java.util.function.Consumer;
 
 public interface SnapshotController extends AutoCloseable {
   /**
+   * Takes a snapshot based on the given position and immediately commits it.
+   *
+   * @param lowerBoundSnapshotPosition the lower bound snapshot position
+   */
+  Snapshot takeSnapshot(long lowerBoundSnapshotPosition);
+
+  /**
    * Takes a snapshot based on the given position. The position is a last processed lower bound
    * event position.
    *
    * @param lowerBoundSnapshotPosition the lower bound snapshot position
    */
-  void takeSnapshot(long lowerBoundSnapshotPosition);
-
-  /** Takes a snapshot into a temporary folder, will overwrite an existing snapshot. */
-  void takeTempSnapshot();
+  Snapshot takeTempSnapshot(long lowerBoundSnapshotPosition);
 
   /**
-   * A temporary snapshot is moved into a new snapshot directory and in that way marked as valid.
-   * The given position is a last processed lower bound event position.
+   * Commits the given temporary snapshot to the underlying storage.
    *
-   * @param lowerBoundSnapshotPosition the lower bound snapshot position
+   * @param snapshot the snapshot to commit
    * @throws IOException thrown if moving the snapshot fails
    */
-  void moveValidSnapshot(long lowerBoundSnapshotPosition) throws IOException;
+  void commitSnapshot(Snapshot snapshot) throws IOException;
 
   /**
    * Replicates the latest valid snapshot. The given executor is called for each snapshot chunk in
@@ -51,19 +54,14 @@ public interface SnapshotController extends AutoCloseable {
    *
    * @return the lower bound position related to the snapshot
    */
-  long recover() throws Exception;
-
-  ZeebeDb openDb();
+  void recover() throws Exception;
 
   /**
-   * Returns the highest position that is considered to be safe to delete, which is the position of
-   * the oldest of the required snapshots. If maxSnapshotCount hasn't been reached, returns -1,
-   * since it's not safe to delete data.
+   * Opens the database from the latest snapshot.
    *
-   * @param maxSnapshotCount the required number of snapshots
-   * @return the position to delete
+   * @return an opened database
    */
-  long getPositionToDelete(int maxSnapshotCount);
+  ZeebeDb openDb();
 
   /**
    * Returns the current number of valid snapshots.
@@ -73,19 +71,9 @@ public interface SnapshotController extends AutoCloseable {
   int getValidSnapshotsCount();
 
   /**
-   * Returns the position of the last valid snapshot. Or, -1 if no valid snapshot exists.
+   * Returns the latest valid snapshot's directory.
    *
-   * @return the snapshot position
+   * @return the latest valid snapshot's directory
    */
-  long getLastValidSnapshotPosition();
-
   File getLastValidSnapshotDirectory();
-
-  File getSnapshotDirectoryFor(long snapshotId);
-
-  /**
-   * Returns a {@link io.zeebe.distributedlog.restore.RestoreInfoResponse RestoreInfoResponse} for
-   * the latest valid snapshot
-   */
-  SnapshotRestoreInfo getLatestSnapshotRestoreInfo();
 }

@@ -26,7 +26,7 @@ public abstract class BrokerExecuteCommand<T> extends BrokerRequest<T> {
   protected final ExecuteCommandRequest request = new ExecuteCommandRequest();
   protected final ExecuteCommandResponse response = new ExecuteCommandResponse();
 
-  public BrokerExecuteCommand(ValueType valueType, Intent intent) {
+  public BrokerExecuteCommand(final ValueType valueType, final Intent intent) {
     super(ExecuteCommandResponseDecoder.SCHEMA_ID, ExecuteCommandResponseDecoder.TEMPLATE_ID);
     request.setValueType(valueType);
     request.setIntent(intent);
@@ -50,7 +50,7 @@ public abstract class BrokerExecuteCommand<T> extends BrokerRequest<T> {
   }
 
   @Override
-  public void setPartitionId(int partitionId) {
+  public void setPartitionId(final int partitionId) {
     request.setPartitionId(partitionId);
   }
 
@@ -65,12 +65,12 @@ public abstract class BrokerExecuteCommand<T> extends BrokerRequest<T> {
   }
 
   @Override
-  protected void setSerializedValue(DirectBuffer buffer) {
+  protected void setSerializedValue(final DirectBuffer buffer) {
     request.setValue(buffer, 0, buffer.capacity());
   }
 
   @Override
-  protected void wrapResponse(DirectBuffer buffer) {
+  protected void wrapResponse(final DirectBuffer buffer) {
     response.wrap(buffer, 0, buffer.capacity());
   }
 
@@ -84,7 +84,7 @@ public abstract class BrokerExecuteCommand<T> extends BrokerRequest<T> {
               response.getRejectionType(),
               response.getRejectionReason());
       return new BrokerRejectionResponse<>(brokerRejection);
-    } else if (isValidValueType()) {
+    } else if (isValidResponse()) {
       final T responseDto = toResponseDto(response.getValue());
       return new BrokerResponse<>(responseDto, response.getPartitionId(), response.getKey());
     } else {
@@ -99,11 +99,11 @@ public abstract class BrokerExecuteCommand<T> extends BrokerRequest<T> {
   }
 
   @Override
-  public void write(MutableDirectBuffer buffer, int offset) {
+  public void write(final MutableDirectBuffer buffer, final int offset) {
     request.write(buffer, offset);
   }
 
-  private boolean isValidValueType() {
+  protected boolean isValidResponse() {
     return response.getValueType() == request.getValueType();
   }
 

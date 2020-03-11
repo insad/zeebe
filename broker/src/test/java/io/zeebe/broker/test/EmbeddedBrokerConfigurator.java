@@ -16,20 +16,19 @@ import io.zeebe.test.util.record.RecordingExporter;
 import java.util.Arrays;
 import java.util.function.Consumer;
 
-public class EmbeddedBrokerConfigurator {
+public final class EmbeddedBrokerConfigurator {
 
   public static final Consumer<BrokerCfg> DEBUG_EXPORTER =
-      cfg -> cfg.getExporters().add(DebugLogExporter.defaultConfig(false));
+      cfg -> cfg.getExporters().put("DebugLogExporter", DebugLogExporter.defaultConfig(false));
 
   public static final Consumer<BrokerCfg> HTTP_EXPORTER =
-      cfg -> cfg.getExporters().add(DebugHttpExporter.defaultConfig());
+      cfg -> cfg.getExporters().put("DebugHttpExporter", DebugHttpExporter.defaultConfig());
 
   public static final Consumer<BrokerCfg> TEST_RECORDER =
       cfg -> {
         final ExporterCfg exporterCfg = new ExporterCfg();
-        exporterCfg.setId("test-recorder");
         exporterCfg.setClassName(RecordingExporter.class.getName());
-        cfg.getExporters().add(exporterCfg);
+        cfg.getExporters().put("test-recorder", exporterCfg);
       };
 
   public static final Consumer<BrokerCfg> DISABLE_EMBEDDED_GATEWAY =
@@ -52,6 +51,9 @@ public class EmbeddedBrokerConfigurator {
       cluster.setReplicationFactor(replicationFactor);
       cluster.setClusterSize(clusterSize);
       cluster.setClusterName(clusterName);
+      cluster.setGossipFailureTimeout(2000);
+      cluster.setGossipInterval(150);
+      cluster.setGossipProbeInterval(250);
     };
   }
 

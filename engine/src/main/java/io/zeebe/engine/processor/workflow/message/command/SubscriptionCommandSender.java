@@ -58,7 +58,7 @@ public class SubscriptionCommandSender {
   private final int senderPartition;
 
   public SubscriptionCommandSender(
-      int senderPartition, PartitionCommandSender partitionCommandSender) {
+      final int senderPartition, final PartitionCommandSender partitionCommandSender) {
     this.senderPartition = senderPartition;
     this.partitionCommandSender = partitionCommandSender;
   }
@@ -67,12 +67,14 @@ public class SubscriptionCommandSender {
       final int subscriptionPartitionId,
       final long workflowInstanceKey,
       final long elementInstanceKey,
+      final DirectBuffer bpmnProcessId,
       final DirectBuffer messageName,
       final DirectBuffer correlationKey,
       final boolean closeOnCorrelate) {
     openMessageSubscriptionCommand.setSubscriptionPartitionId(subscriptionPartitionId);
     openMessageSubscriptionCommand.setWorkflowInstanceKey(workflowInstanceKey);
     openMessageSubscriptionCommand.setElementInstanceKey(elementInstanceKey);
+    openMessageSubscriptionCommand.getBpmnProcessId().wrap(bpmnProcessId);
     openMessageSubscriptionCommand.getMessageName().wrap(messageName);
     openMessageSubscriptionCommand.getCorrelationKey().wrap(correlationKey);
     openMessageSubscriptionCommand.setCloseOnCorrelate(closeOnCorrelate);
@@ -102,18 +104,22 @@ public class SubscriptionCommandSender {
   public boolean correlateWorkflowInstanceSubscription(
       final long workflowInstanceKey,
       final long elementInstanceKey,
+      final DirectBuffer bpmnProcessId,
       final DirectBuffer messageName,
       final long messageKey,
-      final DirectBuffer variables) {
+      final DirectBuffer variables,
+      final DirectBuffer correlationKey) {
 
     final int workflowInstancePartitionId = Protocol.decodePartitionId(workflowInstanceKey);
 
     correlateWorkflowInstanceSubscriptionCommand.setSubscriptionPartitionId(senderPartition);
     correlateWorkflowInstanceSubscriptionCommand.setWorkflowInstanceKey(workflowInstanceKey);
     correlateWorkflowInstanceSubscriptionCommand.setElementInstanceKey(elementInstanceKey);
+    correlateWorkflowInstanceSubscriptionCommand.getBpmnProcessId().wrap(bpmnProcessId);
     correlateWorkflowInstanceSubscriptionCommand.setMessageKey(messageKey);
     correlateWorkflowInstanceSubscriptionCommand.getMessageName().wrap(messageName);
     correlateWorkflowInstanceSubscriptionCommand.getVariables().wrap(variables);
+    correlateWorkflowInstanceSubscriptionCommand.getCorrelationKey().wrap(correlationKey);
 
     return partitionCommandSender.sendCommand(
         workflowInstancePartitionId, correlateWorkflowInstanceSubscriptionCommand);
@@ -123,11 +129,13 @@ public class SubscriptionCommandSender {
       final int subscriptionPartitionId,
       final long workflowInstanceKey,
       final long elementInstanceKey,
+      final DirectBuffer bpmnProcessId,
       final DirectBuffer messageName) {
 
     correlateMessageSubscriptionCommand.setSubscriptionPartitionId(subscriptionPartitionId);
     correlateMessageSubscriptionCommand.setWorkflowInstanceKey(workflowInstanceKey);
     correlateMessageSubscriptionCommand.setElementInstanceKey(elementInstanceKey);
+    correlateMessageSubscriptionCommand.getBpmnProcessId().wrap(bpmnProcessId);
     correlateMessageSubscriptionCommand.getMessageName().wrap(messageName);
 
     return partitionCommandSender.sendCommand(
@@ -167,7 +175,7 @@ public class SubscriptionCommandSender {
 
   public boolean rejectCorrelateMessageSubscription(
       final long workflowInstanceKey,
-      final long elementInstanceKey,
+      final DirectBuffer bpmnProcessId,
       final long messageKey,
       final DirectBuffer messageName,
       final DirectBuffer correlationKey) {
@@ -176,6 +184,7 @@ public class SubscriptionCommandSender {
 
     rejectCorrelateMessageSubscriptionCommand.setSubscriptionPartitionId(senderPartition);
     rejectCorrelateMessageSubscriptionCommand.setWorkflowInstanceKey(workflowInstanceKey);
+    rejectCorrelateMessageSubscriptionCommand.getBpmnProcessId().wrap(bpmnProcessId);
     rejectCorrelateMessageSubscriptionCommand.setMessageKey(messageKey);
     rejectCorrelateMessageSubscriptionCommand.getMessageName().wrap(messageName);
     rejectCorrelateMessageSubscriptionCommand.getCorrelationKey().wrap(correlationKey);

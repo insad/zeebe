@@ -27,7 +27,7 @@ import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class ExclusiveGatewayTest {
+public final class ExclusiveGatewayTest {
 
   @ClassRule public static final EngineRule ENGINE = EngineRule.singlePartition();
 
@@ -48,7 +48,7 @@ public class ExclusiveGatewayTest {
             .endEvent("a")
             .moveToLastGateway()
             .sequenceFlowId("s2")
-            .condition("foo >= 5 && foo < 10")
+            .condition("foo >= 5 and foo < 10")
             .endEvent("b")
             .moveToLastExclusiveGateway()
             .defaultFlow()

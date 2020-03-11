@@ -8,7 +8,7 @@
   <parent>
     <groupId>io.zeebe</groupId>
     <artifactId>zeebe-parent</artifactId>
-    <version>0.21.0-SNAPSHOT</version>
+    <version>0.23.0-SNAPSHOT</version>
     <relativePath>../parent</relativePath>
   </parent>
 
@@ -22,11 +22,6 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.moandjiezana.toml</groupId>
-      <artifactId>toml4j</artifactId>
     </dependency>
 
     <dependency>
@@ -47,4 +42,12 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+  <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
+  </build>
 </project>

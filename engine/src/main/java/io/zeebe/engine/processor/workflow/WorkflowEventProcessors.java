@@ -10,6 +10,7 @@ package io.zeebe.engine.processor.workflow;
 import io.zeebe.engine.processor.KeyGenerator;
 import io.zeebe.engine.processor.TypedRecordProcessors;
 import io.zeebe.engine.processor.workflow.instance.CreateWorkflowInstanceProcessor;
+import io.zeebe.engine.processor.workflow.instance.CreateWorkflowInstanceWithResultProcessor;
 import io.zeebe.engine.processor.workflow.message.CloseWorkflowInstanceSubscription;
 import io.zeebe.engine.processor.workflow.message.CorrelateWorkflowInstanceSubscription;
 import io.zeebe.engine.processor.workflow.message.OpenWorkflowInstanceSubscriptionProcessor;
@@ -34,26 +35,26 @@ import io.zeebe.protocol.record.intent.WorkflowInstanceSubscriptionIntent;
 import java.util.Arrays;
 import java.util.List;
 
-public class WorkflowEventProcessors {
+public final class WorkflowEventProcessors {
 
   private static final List<WorkflowInstanceIntent> WORKFLOW_INSTANCE_COMMANDS =
       Arrays.asList(WorkflowInstanceIntent.CANCEL);
 
-  private static boolean isWorkflowInstanceEvent(WorkflowInstanceIntent intent) {
+  private static boolean isWorkflowInstanceEvent(final WorkflowInstanceIntent intent) {
     return !WORKFLOW_INSTANCE_COMMANDS.contains(intent);
   }
 
   public static BpmnStepProcessor addWorkflowProcessors(
-      ZeebeState zeebeState,
-      TypedRecordProcessors typedRecordProcessors,
-      SubscriptionCommandSender subscriptionCommandSender,
-      CatchEventBehavior catchEventBehavior,
-      DueDateTimerChecker timerChecker) {
+      final ZeebeState zeebeState,
+      final TypedRecordProcessors typedRecordProcessors,
+      final SubscriptionCommandSender subscriptionCommandSender,
+      final CatchEventBehavior catchEventBehavior,
+      final DueDateTimerChecker timerChecker) {
     final WorkflowInstanceSubscriptionState subscriptionState =
         zeebeState.getWorkflowInstanceSubscriptionState();
 
     final WorkflowEngineState workflowEngineState =
-        new WorkflowEngineState(zeebeState.getWorkflowState());
+        new WorkflowEngineState(zeebeState.getPartitionId(), zeebeState.getWorkflowState());
     typedRecordProcessors.withListener(workflowEngineState);
 
     addWorkflowInstanceCommandProcessor(typedRecordProcessors, workflowEngineState, zeebeState);
@@ -73,7 +74,7 @@ public class WorkflowEventProcessors {
 
   private static void addWorkflowInstanceCommandProcessor(
       final TypedRecordProcessors typedRecordProcessors,
-      WorkflowEngineState workflowEngineState,
+      final WorkflowEngineState workflowEngineState,
       final ZeebeState zeebeState) {
 
     final WorkflowInstanceCommandProcessor commandProcessor =
@@ -85,7 +86,8 @@ public class WorkflowEventProcessors {
   }
 
   private static void addBpmnStepProcessor(
-      final TypedRecordProcessors typedRecordProcessors, BpmnStepProcessor bpmnStepProcessor) {
+      final TypedRecordProcessors typedRecordProcessors,
+      final BpmnStepProcessor bpmnStepProcessor) {
 
     Arrays.stream(WorkflowInstanceIntent.values())
         .filter(WorkflowEventProcessors::isWorkflowInstanceEvent)
@@ -97,9 +99,9 @@ public class WorkflowEventProcessors {
 
   private static void addMessageStreamProcessors(
       final TypedRecordProcessors typedRecordProcessors,
-      WorkflowInstanceSubscriptionState subscriptionState,
-      SubscriptionCommandSender subscriptionCommandSender,
-      ZeebeState zeebeState) {
+      final WorkflowInstanceSubscriptionState subscriptionState,
+      final SubscriptionCommandSender subscriptionCommandSender,
+      final ZeebeState zeebeState) {
     typedRecordProcessors
         .onCommand(
             ValueType.WORKFLOW_INSTANCE_SUBSCRIPTION,
@@ -118,9 +120,9 @@ public class WorkflowEventProcessors {
 
   private static void addTimerStreamProcessors(
       final TypedRecordProcessors typedRecordProcessors,
-      DueDateTimerChecker timerChecker,
-      ZeebeState zeebeState,
-      CatchEventBehavior catchEventOutput) {
+      final DueDateTimerChecker timerChecker,
+      final ZeebeState zeebeState,
+      final CatchEventBehavior catchEventOutput) {
     final WorkflowState workflowState = zeebeState.getWorkflowState();
 
     typedRecordProcessors
@@ -135,7 +137,7 @@ public class WorkflowEventProcessors {
   }
 
   private static void addVariableDocumentStreamProcessors(
-      final TypedRecordProcessors typedRecordProcessors, ZeebeState zeebeState) {
+      final TypedRecordProcessors typedRecordProcessors, final ZeebeState zeebeState) {
     final ElementInstanceState elementInstanceState =
         zeebeState.getWorkflowState().getElementInstanceState();
     final VariablesState variablesState = elementInstanceState.getVariablesState();
@@ -147,16 +149,23 @@ public class WorkflowEventProcessors {
   }
 
   private static void addWorkflowInstanceCreationStreamProcessors(
-      final TypedRecordProcessors typedRecordProcessors, ZeebeState zeebeState) {
+      final TypedRecordProcessors typedRecordProcessors, final ZeebeState zeebeState) {
     final WorkflowState workflowState = zeebeState.getWorkflowState();
     final ElementInstanceState elementInstanceState = workflowState.getElementInstanceState();
     final VariablesState variablesState = elementInstanceState.getVariablesState();
     final KeyGenerator keyGenerator = zeebeState.getKeyGenerator();
 
+    final CreateWorkflowInstanceProcessor createProcessor =
+        new CreateWorkflowInstanceProcessor(
+            workflowState, elementInstanceState, variablesState, keyGenerator);
     typedRecordProcessors.onCommand(
         ValueType.WORKFLOW_INSTANCE_CREATION,
         WorkflowInstanceCreationIntent.CREATE,
-        new CreateWorkflowInstanceProcessor(
-            workflowState, elementInstanceState, variablesState, keyGenerator));
+        createProcessor);
+
+    typedRecordProcessors.onCommand(
+        ValueType.WORKFLOW_INSTANCE_CREATION,
+        WorkflowInstanceCreationIntent.CREATE_WITH_AWAITING_RESULT,
+        new CreateWorkflowInstanceWithResultProcessor(createProcessor, elementInstanceState));
   }
 }

@@ -34,7 +34,7 @@ import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class FailJobTest {
+public final class FailJobTest {
   @ClassRule public static final EngineRule ENGINE = EngineRule.singlePartition();
   private static final String PROCESS_ID = "process";
   private static String jobType;
@@ -164,6 +164,18 @@ public class FailJobTest {
   }
 
   @Test
+  public void shouldFailIfJobCreated() {
+    // given
+    final Record<JobRecordValue> job = ENGINE.createJob(jobType, PROCESS_ID);
+
+    // when
+    final Record<JobRecordValue> jobRecord = ENGINE.job().withKey(job.getKey()).fail();
+
+    // then
+    Assertions.assertThat(jobRecord).hasRecordType(RecordType.EVENT).hasIntent(FAILED);
+  }
+
+  @Test
   public void shouldRejectFailIfJobNotFound() {
     // given
     final int key = 123;
@@ -190,21 +202,7 @@ public class FailJobTest {
 
     // then
     Assertions.assertThat(jobRecord).hasRejectionType(RejectionType.INVALID_STATE);
-    assertThat(jobRecord.getRejectionReason()).contains("is marked as failed");
-  }
-
-  @Test
-  public void shouldRejectFailIfJobCreated() {
-    // given
-    final Record<JobRecordValue> job = ENGINE.createJob(jobType, PROCESS_ID);
-
-    // when
-    final Record<JobRecordValue> jobRecord =
-        ENGINE.job().withKey(job.getKey()).withRetries(3).expectRejection().fail();
-
-    // then
-    Assertions.assertThat(jobRecord).hasRejectionType(RejectionType.INVALID_STATE);
-    assertThat(jobRecord.getRejectionReason()).contains("must be activated first");
+    assertThat(jobRecord.getRejectionReason()).contains("it is in state 'FAILED'");
   }
 
   @Test
@@ -223,5 +221,21 @@ public class FailJobTest {
 
     // then
     Assertions.assertThat(jobRecord).hasRejectionType(RejectionType.NOT_FOUND);
+  }
+
+  @Test
+  public void shouldRejectFailIfErrorThrown() {
+    // given
+    final var job = ENGINE.createJob(jobType, PROCESS_ID);
+
+    ENGINE.job().withKey(job.getKey()).withErrorCode("error").throwError();
+
+    // when
+    final Record<JobRecordValue> jobRecord =
+        ENGINE.job().withKey(job.getKey()).withRetries(3).expectRejection().fail();
+
+    // then
+    Assertions.assertThat(jobRecord).hasRejectionType(RejectionType.INVALID_STATE);
+    assertThat(jobRecord.getRejectionReason()).contains("is in state 'ERROR_THROWN'");
   }
 }

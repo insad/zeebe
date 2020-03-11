@@ -4,7 +4,8 @@ export GITHUB_TOKEN=${GITHUB_TOKEN_PSW}
 export GITHUB_ORG=zeebe-io
 export GITHUB_REPO=zeebe
 
-curl -sL https://github.com/aktau/github-release/releases/download/v0.7.2/linux-amd64-github-release.tar.bz2 | tar xjvf - --strip 3
+curl -sL https://github.com/meterup/github-release/releases/download/v0.7.5/linux-amd64-github-release.bz2 | bzip2 -fd - > github-release
+chmod +x github-release
 GITHUB_RELEASE=${PWD}/github-release
 
 ${GITHUB_RELEASE} release --user ${GITHUB_ORG} --repo ${GITHUB_REPO} --tag ${RELEASE_VERSION} --draft --name "Zeebe ${RELEASE_VERSION}" --description ""
@@ -25,6 +26,6 @@ function upload {
 
 upload dist/target zeebe-distribution-${RELEASE_VERSION}.tar.gz
 upload dist/target zeebe-distribution-${RELEASE_VERSION}.zip
-upload clients/zbctl/dist zbctl
-upload clients/zbctl/dist zbctl.exe
-upload clients/zbctl/dist zbctl.darwin
+upload clients/go/cmd/zbctl/dist zbctl
+upload clients/go/cmd/zbctl/dist zbctl.exe
+upload clients/go/cmd/zbctl/dist zbctl.darwin

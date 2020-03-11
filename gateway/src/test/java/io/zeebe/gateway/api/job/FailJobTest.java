@@ -19,13 +19,13 @@ import io.zeebe.protocol.record.ValueType;
 import io.zeebe.protocol.record.intent.JobIntent;
 import org.junit.Test;
 
-public class FailJobTest extends GatewayTest {
+public final class FailJobTest extends GatewayTest {
 
   @Test
   public void shouldMapRequestAndResponse() {
     // given
     final FailJobStub stub = new FailJobStub();
-    stub.registerWith(gateway);
+    stub.registerWith(brokerClient);
 
     final int retries = 123;
 
@@ -42,7 +42,7 @@ public class FailJobTest extends GatewayTest {
     // then
     assertThat(response).isNotNull();
 
-    final BrokerFailJobRequest brokerRequest = gateway.getSingleBrokerRequest();
+    final BrokerFailJobRequest brokerRequest = brokerClient.getSingleBrokerRequest();
     assertThat(brokerRequest.getKey()).isEqualTo(stub.getKey());
     assertThat(brokerRequest.getIntent()).isEqualTo(JobIntent.FAIL);
     assertThat(brokerRequest.getValueType()).isEqualTo(ValueType.JOB);

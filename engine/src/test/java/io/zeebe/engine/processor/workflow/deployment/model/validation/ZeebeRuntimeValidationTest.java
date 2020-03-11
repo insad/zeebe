@@ -10,9 +10,12 @@ package io.zeebe.engine.processor.workflow.deployment.model.validation;
 import static io.zeebe.engine.processor.workflow.deployment.model.validation.ExpectedValidationResult.expect;
 import static org.junit.Assert.fail;
 
+import io.zeebe.el.ExpressionLanguage;
+import io.zeebe.el.ExpressionLanguageFactory;
 import io.zeebe.model.bpmn.Bpmn;
 import io.zeebe.model.bpmn.BpmnModelInstance;
 import io.zeebe.model.bpmn.instance.ConditionExpression;
+import io.zeebe.model.bpmn.instance.zeebe.ZeebeCalledElement;
 import io.zeebe.model.bpmn.instance.zeebe.ZeebeInput;
 import io.zeebe.model.bpmn.instance.zeebe.ZeebeLoopCharacteristics;
 import io.zeebe.model.bpmn.instance.zeebe.ZeebeOutput;
@@ -35,7 +38,20 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
-public class ZeebeRuntimeValidationTest {
+public final class ZeebeRuntimeValidationTest {
+
+  private static final String INVALID_PATH_QUERY = "$.x";
+
+  private static final String INVALID_PATH_QUERY_MESSAGE =
+      "JSON path query is invalid: Unexpected json-path token ROOT_OBJECT";
+
+  private static final String INVALID_EXPRESSION = "?!";
+
+  private static final String INVALID_EXPRESSION_MESSAGE =
+      "failed to parse expression '?!': [1.2] failure: end of input expected\n"
+          + "\n"
+          + "?!\n"
+          + " ^";
 
   public BpmnModelInstance modelInstance;
 
@@ -46,7 +62,7 @@ public class ZeebeRuntimeValidationTest {
   public List<ExpectedValidationResult> expectedResults;
 
   @Parameters(name = "{index}: {1}")
-  public static final Object[][] parameters() {
+  public static Object[][] parameters() {
     return new Object[][] {
       {
         // not a JSON path condition
@@ -54,39 +70,27 @@ public class ZeebeRuntimeValidationTest {
             .startEvent()
             .exclusiveGateway()
             .sequenceFlowId("flow")
-            .condition("foo")
+            .condition(INVALID_EXPRESSION)
             .endEvent()
             .done(),
-        Arrays.asList(
-            expect(
-                ConditionExpression.class,
-                "Condition expression is invalid: [1.4] failure: expected comparison operator ('==', '!=', '<', '<=', '>', '>=')\n"
-                    + "\n"
-                    + "foo\n"
-                    + "   ^"))
+        Arrays.asList(expect(ConditionExpression.class, INVALID_EXPRESSION_MESSAGE))
       },
       {
         // not a json path expression
         Bpmn.createExecutableProcess("process")
             .startEvent()
-            .serviceTask("task", s -> s.zeebeInput("$.foo", "foo"))
+            .serviceTask("task", s -> s.zeebeInput(INVALID_PATH_QUERY, "foo"))
             .endEvent()
             .done(),
-        Arrays.asList(
-            expect(
-                ZeebeInput.class,
-                "JSON path query is invalid: Unexpected json-path token ROOT_OBJECT"))
+        Arrays.asList(expect(ZeebeInput.class, INVALID_PATH_QUERY_MESSAGE))
       },
       { // not a json path expression
         Bpmn.createExecutableProcess("process")
             .startEvent()
-            .serviceTask("task", s -> s.zeebeOutput("$.foo", "foo"))
+            .serviceTask("task", s -> s.zeebeOutput(INVALID_PATH_QUERY, "foo"))
             .endEvent()
             .done(),
-        Arrays.asList(
-            expect(
-                ZeebeOutput.class,
-                "JSON path query is invalid: Unexpected json-path token ROOT_OBJECT"))
+        Arrays.asList(expect(ZeebeOutput.class, INVALID_PATH_QUERY_MESSAGE))
       },
       {
         // input source expression is not supported
@@ -117,47 +121,29 @@ public class ZeebeRuntimeValidationTest {
         Bpmn.createExecutableProcess("process")
             .startEvent()
             .intermediateCatchEvent("catch")
-            .message(b -> b.name("message").zeebeCorrelationKey("$.foo"))
+            .message(b -> b.name("message").zeebeCorrelationKey(INVALID_PATH_QUERY))
             .endEvent()
             .done(),
-        Arrays.asList(
-            expect(
-                ZeebeSubscription.class,
-                "JSON path query is invalid: Unexpected json-path token ROOT_OBJECT"))
+        Arrays.asList(expect(ZeebeSubscription.class, INVALID_PATH_QUERY_MESSAGE))
       },
       {
         // correlation key expression is not supported
         Bpmn.createExecutableProcess("process")
             .startEvent()
             .receiveTask("catch")
-            .message(b -> b.name("message").zeebeCorrelationKey("$.foo"))
+            .message(b -> b.name("message").zeebeCorrelationKey(INVALID_PATH_QUERY))
             .endEvent()
             .done(),
-        Arrays.asList(
-            expect(
-                ZeebeSubscription.class,
-                "JSON path query is invalid: Unexpected json-path token ROOT_OBJECT"))
-      },
-      {
-        // correlation key expression is empty
-        Bpmn.createExecutableProcess("process")
-            .startEvent()
-            .receiveTask("catch")
-            .message(b -> b.name("message").zeebeCorrelationKey(null))
-            .endEvent()
-            .done(),
-        Arrays.asList(expect(ZeebeSubscription.class, "JSON path query is empty"))
+        Arrays.asList(expect(ZeebeSubscription.class, INVALID_PATH_QUERY_MESSAGE))
       },
       {
         // input collection expression is not supported
         Bpmn.createExecutableProcess("process")
             .startEvent()
-            .serviceTask("task", t -> t.multiInstance(m -> m.zeebeInputCollection("$.foo.bar")))
+            .serviceTask(
+                "task", t -> t.multiInstance(m -> m.zeebeInputCollection(INVALID_PATH_QUERY)))
             .done(),
-        Arrays.asList(
-            expect(
-                ZeebeLoopCharacteristics.class,
-                "JSON path query is invalid: Unexpected json-path token ROOT_OBJECT"))
+        Arrays.asList(expect(ZeebeLoopCharacteristics.class, INVALID_PATH_QUERY_MESSAGE))
       },
       {
         // output element expression is not supported
@@ -170,19 +156,27 @@ public class ZeebeRuntimeValidationTest {
                         m ->
                             m.zeebeInputCollection("foo")
                                 .zeebeOutputCollection("bar")
-                                .zeebeOutputElement("$.b")))
+                                .zeebeOutputElement(INVALID_PATH_QUERY)))
             .done(),
-        Arrays.asList(
-            expect(
-                ZeebeLoopCharacteristics.class,
-                "JSON path query is invalid: Unexpected json-path token ROOT_OBJECT"))
+        Arrays.asList(expect(ZeebeLoopCharacteristics.class, INVALID_PATH_QUERY_MESSAGE))
+      },
+      {
+        // process id expression is not supported
+        Bpmn.createExecutableProcess("process")
+            .startEvent()
+            .callActivity("call", c -> c.zeebeProcessIdExpression(INVALID_EXPRESSION))
+            .done(),
+        Arrays.asList(expect(ZeebeCalledElement.class, INVALID_EXPRESSION_MESSAGE))
       },
     };
   }
 
   private static ValidationResults validate(final BpmnModelInstance model) {
     final ModelWalker walker = new ModelWalker(model);
-    final ValidationVisitor visitor = new ValidationVisitor(ZeebeRuntimeValidators.VALIDATORS);
+    final ExpressionLanguage expressionLanguage =
+        ExpressionLanguageFactory.createExpressionLanguage();
+    final ValidationVisitor visitor =
+        new ValidationVisitor(ZeebeRuntimeValidators.getValidators(expressionLanguage));
     walker.walk(visitor);
 
     return visitor.getValidationResult();

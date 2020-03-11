@@ -17,7 +17,7 @@ package io.zeebe.client;
 
 import java.time.Duration;
 
-public class ClientProperties {
+public final class ClientProperties {
   /** @see ZeebeClientBuilder#brokerContactPoint(String) */
   public static final String BROKER_CONTACTPOINT = "zeebe.client.broker.contactPoint";
 
@@ -28,7 +28,7 @@ public class ClientProperties {
   public static final String JOB_WORKER_MAX_JOBS_ACTIVE = "zeebe.client.worker.maxJobsActive";
 
   /** @see ZeebeClientBuilder#defaultJobWorkerName(String) */
-  public static final String DEFAULT_JOB_WORKER_NAME = "zeebe.client.job.worker";
+  public static final String DEFAULT_JOB_WORKER_NAME = "zeebe.client.worker.name";
 
   /** @see ZeebeClientBuilder#defaultJobTimeout(java.time.Duration) */
   public static final String DEFAULT_JOB_TIMEOUT = "zeebe.client.job.timeout";
@@ -47,4 +47,7 @@ public class ClientProperties {
 
   /** @see ZeebeClientBuilder#caCertificatePath(String) */
   public static final String CA_CERTIFICATE_PATH = "zeebe.client.security.certpath";
+
+  /** @see io.zeebe.client.ZeebeClientBuilder#keepAlive(Duration) */
+  public static final String KEEP_ALIVE = "zeebe.client.keepalive";
 }

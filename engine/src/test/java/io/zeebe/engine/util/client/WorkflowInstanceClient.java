@@ -7,7 +7,11 @@
  */
 package io.zeebe.engine.util.client;
 
+import static io.zeebe.util.buffer.BufferUtil.wrapString;
+
 import io.zeebe.engine.util.StreamProcessorRule;
+import io.zeebe.msgpack.property.ArrayProperty;
+import io.zeebe.msgpack.value.StringValue;
 import io.zeebe.protocol.impl.record.value.workflowinstance.WorkflowInstanceCreationRecord;
 import io.zeebe.protocol.impl.record.value.workflowinstance.WorkflowInstanceRecord;
 import io.zeebe.protocol.record.Record;
@@ -17,21 +21,22 @@ import io.zeebe.protocol.record.value.WorkflowInstanceRecordValue;
 import io.zeebe.test.util.MsgPackUtil;
 import io.zeebe.test.util.record.RecordingExporter;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
-public class WorkflowInstanceClient {
+public final class WorkflowInstanceClient {
 
   private final StreamProcessorRule environmentRule;
 
-  public WorkflowInstanceClient(StreamProcessorRule environmentRule) {
+  public WorkflowInstanceClient(final StreamProcessorRule environmentRule) {
     this.environmentRule = environmentRule;
   }
 
-  public WorkflowInstanceCreationClient ofBpmnProcessId(String bpmnProcessId) {
+  public WorkflowInstanceCreationClient ofBpmnProcessId(final String bpmnProcessId) {
     return new WorkflowInstanceCreationClient(environmentRule, bpmnProcessId);
   }
 
-  public ExistingInstanceClient withInstanceKey(long workflowInstanceKey) {
+  public ExistingInstanceClient withInstanceKey(final long workflowInstanceKey) {
     return new ExistingInstanceClient(environmentRule, workflowInstanceKey);
   }
 
@@ -41,25 +46,30 @@ public class WorkflowInstanceClient {
     private final WorkflowInstanceCreationRecord workflowInstanceCreationRecord;
 
     public WorkflowInstanceCreationClient(
-        StreamProcessorRule environmentRule, String bpmnProcessId) {
+        final StreamProcessorRule environmentRule, final String bpmnProcessId) {
       this.environmentRule = environmentRule;
       this.workflowInstanceCreationRecord = new WorkflowInstanceCreationRecord();
       workflowInstanceCreationRecord.setBpmnProcessId(bpmnProcessId);
     }
 
-    public WorkflowInstanceCreationClient withVariables(Map<String, Object> variables) {
+    public WorkflowInstanceCreationClient withVariables(final Map<String, Object> variables) {
       workflowInstanceCreationRecord.setVariables(MsgPackUtil.asMsgPack(variables));
       return this;
     }
 
-    public WorkflowInstanceCreationClient withVariables(String variables) {
+    public WorkflowInstanceCreationClient withVariables(final String variables) {
       workflowInstanceCreationRecord.setVariables(MsgPackUtil.asMsgPack(variables));
       return this;
     }
 
-    public WorkflowInstanceCreationClient withVariable(String key, Object value) {
+    public WorkflowInstanceCreationClient withVariable(final String key, final Object value) {
       workflowInstanceCreationRecord.setVariables(MsgPackUtil.asMsgPack(key, value));
       return this;
+    }
+
+    public WorkflowInstanceCreationWithResultClient withResult() {
+      return new WorkflowInstanceCreationWithResultClient(
+          environmentRule, workflowInstanceCreationRecord);
     }
 
     public long create() {
@@ -73,6 +83,60 @@ public class WorkflowInstanceClient {
           .getFirst()
           .getValue()
           .getWorkflowInstanceKey();
+    }
+  }
+
+  public static class WorkflowInstanceCreationWithResultClient {
+    private final StreamProcessorRule environmentRule;
+    private final WorkflowInstanceCreationRecord record;
+    private long requestId = 1L;
+    private int requestStreamId = 1;
+
+    public WorkflowInstanceCreationWithResultClient(
+        final StreamProcessorRule environmentRule, final WorkflowInstanceCreationRecord record) {
+      this.environmentRule = environmentRule;
+      this.record = record;
+    }
+
+    public WorkflowInstanceCreationWithResultClient withFetchVariables(
+        final Set<String> fetchVariables) {
+      final ArrayProperty<StringValue> variablesToCollect = record.fetchVariables();
+      fetchVariables.forEach(variable -> variablesToCollect.add().wrap(wrapString(variable)));
+      return this;
+    }
+
+    public WorkflowInstanceCreationWithResultClient withRequestId(final long requestId) {
+      this.requestId = requestId;
+      return this;
+    }
+
+    public WorkflowInstanceCreationWithResultClient withRequestStreamId(final int requestStreamId) {
+      this.requestStreamId = requestStreamId;
+      return this;
+    }
+
+    public long create() {
+      final long position =
+          environmentRule.writeCommand(
+              requestStreamId,
+              requestId,
+              WorkflowInstanceCreationIntent.CREATE_WITH_AWAITING_RESULT,
+              record);
+
+      return RecordingExporter.workflowInstanceCreationRecords()
+          .withIntent(WorkflowInstanceCreationIntent.CREATED)
+          .withSourceRecordPosition(position)
+          .getFirst()
+          .getValue()
+          .getWorkflowInstanceKey();
+    }
+
+    public void asyncCreate() {
+      environmentRule.writeCommand(
+          requestStreamId,
+          requestId,
+          WorkflowInstanceCreationIntent.CREATE_WITH_AWAITING_RESULT,
+          record);
     }
   }
 
@@ -102,12 +166,13 @@ public class WorkflowInstanceClient {
     private int partition = DEFAULT_PARTITION;
     private Function<Long, Record<WorkflowInstanceRecordValue>> expectation = SUCCESS_EXPECTATION;
 
-    public ExistingInstanceClient(StreamProcessorRule environmentRule, long workflowInstanceKey) {
+    public ExistingInstanceClient(
+        final StreamProcessorRule environmentRule, final long workflowInstanceKey) {
       this.environmentRule = environmentRule;
       this.workflowInstanceKey = workflowInstanceKey;
     }
 
-    public ExistingInstanceClient onPartition(int partition) {
+    public ExistingInstanceClient onPartition(final int partition) {
       this.partition = partition;
       return this;
     }

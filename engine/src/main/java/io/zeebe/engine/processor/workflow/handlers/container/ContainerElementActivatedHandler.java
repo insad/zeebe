@@ -8,8 +8,8 @@
 package io.zeebe.engine.processor.workflow.handlers.container;
 
 import io.zeebe.engine.processor.workflow.BpmnStepContext;
-import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableCatchEventElement;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableFlowElementContainer;
+import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableStartEvent;
 import io.zeebe.engine.processor.workflow.handlers.element.ElementActivatedHandler;
 import io.zeebe.engine.state.deployment.WorkflowState;
 import io.zeebe.engine.state.instance.IndexedRecord;
@@ -18,7 +18,7 @@ import io.zeebe.protocol.impl.record.value.workflowinstance.WorkflowInstanceReco
 import io.zeebe.protocol.record.intent.WorkflowInstanceIntent;
 import java.util.List;
 
-public class ContainerElementActivatedHandler<T extends ExecutableFlowElementContainer>
+public final class ContainerElementActivatedHandler<T extends ExecutableFlowElementContainer>
     extends ElementActivatedHandler<T> {
   private final WorkflowState workflowState;
 
@@ -39,59 +39,75 @@ public class ContainerElementActivatedHandler<T extends ExecutableFlowElementCon
     }
 
     final ExecutableFlowElementContainer element = context.getElement();
-    final ExecutableCatchEventElement firstStartEvent = element.getStartEvents().get(0);
+    final var noneStartEvent = element.getNoneStartEvent();
+    final var deferredRecord = getDeferredRecord(context);
 
-    // workflows with none start event only have a single none start event and no other types of
-    // start events; note that embedded sub-processes only have a single none start event, so
-    // publishing a deferred record only applies to processes
-    if (firstStartEvent.isNone()) {
-      activateNoneStartEvent(context, firstStartEvent);
+    if (deferredRecord != null) {
+      // workflow instance is created by an event
+      // - the corresponding start event is deferred
+      publishDeferredRecord(context, deferredRecord);
+
+    } else if (noneStartEvent != null) {
+      // workflow instance is create via command or call activity,
+      // or subprocess is activated
+      // - activate none none start event
+      activateStartEvent(context, noneStartEvent);
+
     } else {
-      publishDeferredRecord(context);
+      // event subprocess is activated
+      // - activate the corresponding start event
+      final var startEvent = element.getStartEvents().get(0);
+      activateStartEvent(context, startEvent);
     }
 
     context
         .getStateDb()
         .getElementInstanceState()
         .spawnToken(context.getElementInstance().getKey());
+
     return true;
   }
 
-  private void publishDeferredRecord(final BpmnStepContext<T> context) {
-    final IndexedRecord deferredRecord = getDeferredRecord(context);
-    context
-        .getOutput()
-        .appendFollowUpEvent(
-            deferredRecord.getKey(), deferredRecord.getState(), deferredRecord.getValue());
-  }
-
-  private void activateNoneStartEvent(
-      final BpmnStepContext<T> context, final ExecutableCatchEventElement firstStartEvent) {
+  private void activateStartEvent(
+      final BpmnStepContext<T> context, final ExecutableStartEvent startEvent) {
     final WorkflowInstanceRecord value = context.getValue();
 
-    value.setElementId(firstStartEvent.getId());
-    value.setBpmnElementType(firstStartEvent.getElementType());
+    value.setElementId(startEvent.getId());
+    value.setBpmnElementType(startEvent.getElementType());
     value.setFlowScopeKey(context.getKey());
     context.getOutput().appendNewEvent(WorkflowInstanceIntent.ELEMENT_ACTIVATING, value);
   }
 
   private IndexedRecord getDeferredRecord(final BpmnStepContext<T> context) {
-    final long wfInstanceKey = context.getValue().getWorkflowInstanceKey();
+    final long scopeKey = context.getKey();
     final List<IndexedRecord> deferredRecords =
-        context.getElementInstanceState().getDeferredRecords(wfInstanceKey);
+        context.getElementInstanceState().getDeferredRecords(scopeKey);
 
-    if (deferredRecords.isEmpty()) {
+    if (deferredRecords.size() > 1) {
       throw new IllegalStateException(
-          "Expected process with no none start events to have a deferred record, but nothing was found");
+          String.format(
+              "Expected one deferred token at %s but found %d.",
+              context.getElementInstance(), deferredRecords.size()));
     }
 
-    assert deferredRecords.size() == 1
-        : "should only have one deferred start event per workflow instance";
+    if (deferredRecords.isEmpty()) {
+      return null;
 
-    final IndexedRecord deferredRecord = deferredRecords.get(0);
-    workflowState
-        .getElementInstanceState()
-        .removeStoredRecord(wfInstanceKey, deferredRecord.getKey(), Purpose.DEFERRED);
-    return deferredRecord;
+    } else {
+      final IndexedRecord deferredRecord = deferredRecords.get(0);
+      workflowState
+          .getElementInstanceState()
+          .removeStoredRecord(scopeKey, deferredRecord.getKey(), Purpose.DEFERRED);
+
+      return deferredRecord;
+    }
+  }
+
+  private void publishDeferredRecord(
+      final BpmnStepContext<T> context, final IndexedRecord deferredRecord) {
+    context
+        .getOutput()
+        .appendFollowUpEvent(
+            deferredRecord.getKey(), deferredRecord.getState(), deferredRecord.getValue());
   }
 }

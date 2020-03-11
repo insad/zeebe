@@ -30,7 +30,7 @@ Elements marked in orange are currently implemented by Zeebe.
   <div>
     <div class="bpmn-symbol-group">
       <h3>Subprocesses</h3>
-        <a href="/bpmn-workflows/subprocesses.html">
+        <a href="/bpmn-workflows/embedded-subprocesses/embedded-subprocesses.html">
           <div class="bpmn-symbol-container implemented">
             <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.375px;">
               <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
@@ -43,33 +43,33 @@ Elements marked in orange are currently implemented by Zeebe.
             <span class="fa fa-link bpmn-symbol-link"></span>
           </div>
         </a>
-      <div class="bpmn-symbol-container">
-        <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.25px;">
-          <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
-          <rect x="49" y="73" width="12" height="12" r="0" rx="0" ry="0" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
-          <path fill="none" stroke="#333333" d="M50,71V77M47,74H53" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" transform="matrix(1,0,0,1,5,5)" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></path>
-          <text x="55" y="45" text-anchor="middle" font="10px &quot;Arial&quot;" stroke="none" fill="#333333" style="text-anchor: middle; font-style: normal; font-variant: normal; font-weight: normal; font-stretch: normal; font-size: 12px; line-height: normal; font-family: Arial, Helvetica, sans-serif;" font-size="12px" font-family="Arial, Helvetica, sans-serif">
-            <tspan dy="4">Call Activity</tspan>
-          </text>
-        </svg>
-        <a href="">
-          <span class="glyphicon glyphicon-eye-open"></span>
+        <a href="/bpmn-workflows/call-activities/call-activities.html">
+            <div class="bpmn-symbol-container implemented">
+            <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.25px;">
+              <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
+              <rect x="49" y="73" width="12" height="12" r="0" rx="0" ry="0" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
+              <path fill="none" stroke="#333333" d="M50,71V77M47,74H53" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" transform="matrix(1,0,0,1,5,5)" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></path>
+              <text x="55" y="45" text-anchor="middle" font="10px &quot;Arial&quot;" stroke="none" fill="#333333" style="text-anchor: middle; font-style: normal; font-variant: normal; font-weight: normal; font-stretch: normal; font-size: 12px; line-height: normal; font-family: Arial, Helvetica, sans-serif;" font-size="12px" font-family="Arial, Helvetica, sans-serif">
+                <tspan dy="4">Call Activity</tspan>
+              </text>
+            </svg>
+            <span class="fa fa-link bpmn-symbol-link"></span>
+          </div>
         </a>
-      </div>
-      <div class="bpmn-symbol-container">
-        <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.125px;">
-          <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" stroke-dasharray="2,2" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
-          <rect x="49" y="73" width="12" height="12" r="0" rx="0" ry="0" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
-          <path fill="none" stroke="#333333" d="M50,71V77M47,74H53" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" transform="matrix(1,0,0,1,5,5)" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></path>
-          <text x="55" y="45" text-anchor="middle" font="10px &quot;Arial&quot;" stroke="none" fill="#333333" style="text-anchor: middle; font-style: normal; font-variant: normal; font-weight: normal; font-stretch: normal; font-size: 12px; line-height: normal; font-family: Arial, Helvetica, sans-serif;" font-size="12px" font-family="Arial, Helvetica, sans-serif">
-            <tspan dy="-3.1953125">Event</tspan>
-            <tspan dy="14.399999999999999" x="55">Subprocess</tspan>
-          </text>
-        </svg>
-        <a href="">
-          <span class="glyphicon glyphicon-eye-open"></span>
-        </a>
-      </div>
+      <a href="/bpmn-workflows/event-subprocesses/event-subprocesses.html">
+        <div class="bpmn-symbol-container implemented">
+          <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.125px;">
+            <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" stroke-dasharray="2,2" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
+            <rect x="49" y="73" width="12" height="12" r="0" rx="0" ry="0" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
+            <path fill="none" stroke="#333333" d="M50,71V77M47,74H53" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" transform="matrix(1,0,0,1,5,5)" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></path>
+            <text x="55" y="45" text-anchor="middle" font="10px &quot;Arial&quot;" stroke="none" fill="#333333" style="text-anchor: middle; font-style: normal; font-variant: normal; font-weight: normal; font-stretch: normal; font-size: 12px; line-height: normal; font-family: Arial, Helvetica, sans-serif;" font-size="12px" font-family="Arial, Helvetica, sans-serif">
+              <tspan dy="-3.1953125">Event</tspan>
+              <tspan dy="14.399999999999999" x="55">Subprocess</tspan>
+            </text>
+          </svg>
+					<span class="fa fa-link bpmn-symbol-link"></span>
+        </div>
+      </a>
       <div class="bpmn-symbol-container">
         <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg">
           <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
@@ -89,7 +89,7 @@ Elements marked in orange are currently implemented by Zeebe.
   <div>
     <div class="bpmn-symbol-group">
       <h3>Tasks</h3>
-      <a href="/bpmn-workflows/service-tasks.html">
+      <a href="/bpmn-workflows/service-tasks/service-tasks.html">
         <div class="bpmn-symbol-container implemented">
           <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg">
             <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
@@ -159,7 +159,7 @@ Elements marked in orange are currently implemented by Zeebe.
           <span class="glyphicon glyphicon-eye-open"></span>
         </a>
       </div>
-      <a href="/bpmn-workflows/receive-tasks.html">
+      <a href="/bpmn-workflows/receive-tasks/receive-tasks.html">
         <div class="bpmn-symbol-container implemented">
           <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.375px;">
             <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
@@ -207,7 +207,7 @@ Elements marked in orange are currently implemented by Zeebe.
   <div>
     <div class="bpmn-symbol-group">
       <h3>Gateways</h3>
-      <a href="/bpmn-workflows/exclusive-gateways.html">
+      <a href="/bpmn-workflows/exclusive-gateways/exclusive-gateways.html">
         <div class="bpmn-symbol-container implemented">
           <svg height="60" version="1.1" width="60" xmlns="http://www.w3.org/2000/svg">
             <path fill="#ffffff" stroke="#333333" d="M5,25L25,5L45,25L25,45L5,25" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></path>
@@ -231,7 +231,7 @@ Elements marked in orange are currently implemented by Zeebe.
           <span class="glyphicon glyphicon-eye-open"></span>
         </a>
       </div>
-      <a href="/bpmn-workflows/parallel-gateways.html">
+      <a href="/bpmn-workflows/parallel-gateways/parallel-gateways.html">
         <div class="bpmn-symbol-container implemented">
           <svg height="60" version="1.1" width="60" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.75px;">
             <path fill="#ffffff" stroke="#333333" d="M5,25L25,5L45,25L25,45L5,25" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></path>
@@ -243,7 +243,7 @@ Elements marked in orange are currently implemented by Zeebe.
           <span class="fa fa-link bpmn-symbol-link"></span>
         </div>
       </a>
-      <a href="/bpmn-workflows/event-based-gateways.html">
+      <a href="/bpmn-workflows/event-based-gateways/event-based-gateways.html">
 	      <div class="bpmn-symbol-container implemented">
 	        <svg height="60" version="1.1" width="60" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.625px;">
 	          <path fill="#ffffff" stroke="#333333" d="M5,25L25,5L45,25L25,45L5,25" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></path>
@@ -314,6 +314,58 @@ Elements marked in orange are currently implemented by Zeebe.
   </div>
 </div>
 
+<div>
+    <div class="bpmn-symbol-group">
+    <h3>Markers</h3>
+    <a href="/bpmn-workflows/multi-instance/multi-instance.html">
+      <div class="bpmn-symbol-container implemented">
+        <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.375px;">
+          <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
+          <path fill="none" stroke="#333333"  d="m44,60 m 3,2 l 0,10 m 3,-10 l 0,10 m 3,-10 l 0,10" data-marker="parallel" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" transform="matrix(1,0,0,1,5,5)" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"/>
+          <text x="55" y="45" text-anchor="middle" font="10px &quot;Arial&quot;" stroke="none" fill="#333333" style="text-anchor: middle; font-style: normal; font-variant: normal; font-weight: normal; font-stretch: normal; font-size: 12px; line-height: normal; font-family: Arial, Helvetica, sans-serif;" font-size="12px" font-family="Arial, Helvetica, sans-serif">
+            <tspan dy="4">Multi-Instance</tspan>
+          </text>
+        </svg>
+        <span class="fa fa-link bpmn-symbol-link"></span>
+      </div>
+    </a>
+    <div class="bpmn-symbol-container">
+        <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.375px;">
+              <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
+              <path fill="none" stroke="#333333" d="m 50,73 c 3.526979,0 6.386161,-2.829858 6.386161,-6.320661 0,-3.490806 -2.859182,-6.320661 -6.386161,-6.320661 -3.526978,0 -6.38616,2.829855 -6.38616,6.320661 0,1.745402 0.714797,3.325567 1.870463,4.469381 0.577834,0.571908 1.265885,1.034728 2.029916,1.35457 l -0.718163,-3.909793 m 0.718163,3.909793 -3.885211,0.802902" data-marker="loop" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" transform="matrix(1,0,0,1,5,5)" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></path>
+              <text x="55" y="45" text-anchor="middle" font="10px &quot;Arial&quot;" stroke="none" fill="#333333" style="text-anchor: middle; font-style: normal; font-variant: normal; font-weight: normal; font-stretch: normal; font-size: 12px; line-height: normal; font-family: Arial, Helvetica, sans-serif;" font-size="12px" font-family="Arial, Helvetica, sans-serif">
+                <tspan dy="4">Loop</tspan>
+              </text>
+            </svg>
+        <a href="">
+          <span class="glyphicon glyphicon-eye-open"></span>
+        </a>
+    </div>
+    <div class="bpmn-symbol-container">
+        <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.375px;">
+              <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
+              <path fill="none" stroke="#333333" d="m 44,67 7,-5 0,10 z m 7.1,-0.3 6.9,-4.7 0,10 -6.9,-4.7 z" data-marker="compensation" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" transform="matrix(1,0,0,1,5,5)" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></path>
+              <text x="55" y="45" text-anchor="middle" font="10px &quot;Arial&quot;" stroke="none" fill="#333333" style="text-anchor: middle; font-style: normal; font-variant: normal; font-weight: normal; font-stretch: normal; font-size: 12px; line-height: normal; font-family: Arial, Helvetica, sans-serif;" font-size="12px" font-family="Arial, Helvetica, sans-serif">
+                <tspan dy="4">Compensation</tspan>
+              </text>
+            </svg>
+        <a href="">
+          <span class="glyphicon glyphicon-eye-open"></span>
+        </a>
+    </div>
+    <div class="bpmn-symbol-container">
+        <svg height="90" version="1.1" width="110" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.375px;">
+              <rect x="5" y="5" width="100" height="80" r="5" rx="5" ry="5" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></rect>
+              <path fill="none" stroke="#333333" d="m 44,65 m 0.84461,2.64411 c 1.05533,-1.23780996 2.64337,-2.07882 4.29653,-1.97997996 2.05163,0.0805 3.85579,1.15803 5.76082,1.79107 1.06385,0.34139996 2.24454,0.1438 3.18759,-0.43767 0.61743,-0.33642 1.2775,-0.64078 1.7542,-1.17511 0,0.56023 0,1.12046 0,1.6807 -0.98706,0.96237996 -2.29792,1.62393996 -3.6918,1.66181996 -1.24459,0.0927 -2.46671,-0.2491 -3.59505,-0.74812 -1.35789,-0.55965 -2.75133,-1.33436996 -4.27027,-1.18121996 -1.37741,0.14601 -2.41842,1.13685996 -3.44288,1.96782996 z" data-marker="adhoc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" transform="matrix(1,0,0,1,5,5)" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></path>
+              <text x="55" y="45" text-anchor="middle" font="10px &quot;Arial&quot;" stroke="none" fill="#333333" style="text-anchor: middle; font-style: normal; font-variant: normal; font-weight: normal; font-stretch: normal; font-size: 12px; line-height: normal; font-family: Arial, Helvetica, sans-serif;" font-size="12px" font-family="Arial, Helvetica, sans-serif">
+                <tspan dy="4">Ad-Hoc</tspan>
+              </text>
+            </svg>
+        <a href="">
+          <span class="glyphicon glyphicon-eye-open"></span>
+        </a>
+    </div>
+</div>
 
 <h3>Events</h3>
 <table class="table table-responsive table-bordered bpmn-events">
@@ -342,7 +394,7 @@ Elements marked in orange are currently implemented by Zeebe.
       <td></td>
     </tr>
     <tr>
-      <td><a href="/bpmn-workflows/none-events.html">None</a></td>
+      <td><a href="/bpmn-workflows/none-events/none-events.html">None</a></td>
       <td class="implemented">
         <svg height="40" version="1.1" width="40" xmlns="http://www.w3.org/2000/svg">
           <g class="djs-visual">
@@ -368,7 +420,7 @@ Elements marked in orange are currently implemented by Zeebe.
       </td>
     </tr>
     <tr>
-      <td><a href="/bpmn-workflows/message-events.html">Message</a></td>
+      <td><a href="/bpmn-workflows/message-events/message-events.html">Message</a></td>
       <td class="implemented">
           <svg height="40" version="1.1" width="40" xmlns="http://www.w3.org/2000/svg">
             <g class="djs-visual">
@@ -377,7 +429,7 @@ Elements marked in orange are currently implemented by Zeebe.
             </g>
           </svg>
       </td>
-      <td>
+      <td class="implemented">
           <svg height="40" version="1.1" width="40" xmlns="http://www.w3.org/2000/svg">
             <g class="djs-visual">
               <circle cx="20" cy="20" r="15" fill="#ffffff" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" id="svg_1"></circle>
@@ -385,7 +437,7 @@ Elements marked in orange are currently implemented by Zeebe.
             </g>
           </svg>
       </td>
-      <td>
+      <td class="implemented">
           <svg height="40" version="1.1" width="40" xmlns="http://www.w3.org/2000/svg" style="overflow: hidden; position: relative; left: -0.5px;">
             <g class="djs-visual">
               <circle cx="20" cy="20" r="15" fill="#ffffff" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" stroke-dasharray="3,3" id="svg_1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></circle>
@@ -429,7 +481,7 @@ Elements marked in orange are currently implemented by Zeebe.
       </td>
     </tr>
     <tr>
-      <td><a href="/bpmn-workflows/timer-events.html">Timer</a></td>
+      <td><a href="/bpmn-workflows/timer-events/timer-events.html">Timer</a></td>
       <td class="implemented">
           <svg height="40" version="1.1" width="40" xmlns="http://www.w3.org/2000/svg">
             <g class="djs-visual">
@@ -439,7 +491,7 @@ Elements marked in orange are currently implemented by Zeebe.
             </g>
           </svg>
       </td>
-      <td>
+      <td class="implemented">
           <svg height="40" version="1.1" width="40" xmlns="http://www.w3.org/2000/svg">
             <g class="djs-visual">
               <circle cx="20" cy="20" r="15" fill="#ffffff" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" id="svg_1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></circle>
@@ -448,7 +500,7 @@ Elements marked in orange are currently implemented by Zeebe.
             </g>
           </svg>
       </td>
-      <td>
+      <td class="implemented">
           <svg height="40" version="1.1" width="40" xmlns="http://www.w3.org/2000/svg">
             <g class="djs-visual">
               <circle cx="20" cy="20" r="15" fill="#ffffff" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" stroke-dasharray="3,3" id="svg_1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></circle>
@@ -619,9 +671,9 @@ Elements marked in orange are currently implemented by Zeebe.
       </td>
     </tr>
     <tr>
-      <td>Error</td>
+      <td><a href="/bpmn-workflows/error-events/error-events.html">Error</a></td>
       <td></td>
-      <td>
+      <td class="implemented">
           <svg height="40" version="1.1" width="40" xmlns="http://www.w3.org/2000/svg">
             <g class="djs-visual">
               <circle cx="20" cy="20" r="15" fill="#ffffff" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" id="svg_1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></circle>
@@ -631,7 +683,7 @@ Elements marked in orange are currently implemented by Zeebe.
       </td>
       <td></td>
       <td></td>
-      <td>
+      <td class="implemented">
           <svg height="40" version="1.1" width="40" xmlns="http://www.w3.org/2000/svg">
             <circle cx="20" cy="20" r="15" fill="#ffffff" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" id="svg_1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></circle>
             <circle cx="20" cy="20" r="12" fill="none" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></circle>
@@ -640,7 +692,7 @@ Elements marked in orange are currently implemented by Zeebe.
       </td>
       <td></td>
       <td></td>
-      <td>
+      <td class="implemented">
           <svg height="40" version="1.1" width="40" xmlns="http://www.w3.org/2000/svg">
             <circle cx="20" cy="20" r="15" fill="#ffffff" stroke="#333333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" id="svg_1" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></circle>
             <path fill="#333333" stroke="none" d="M21.820839,10.171502L18.36734,23.58992L12.541380000000002,13.281818999999999L8.338651200000001,19.071607L12.048949000000002,5.832305699999999L17.996148000000005,15.132659L21.820839,10.171502Z" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="1" transform="matrix(0.9375,0,0,0.9375,5.9425,5.9194)" style="stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 1;"></path>

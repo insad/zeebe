@@ -1,8 +1,11 @@
 {
   "index_patterns": [
-    "zeebe-record-job_*"
+    "zeebe-record_job_*"
   ],
   "order": 20,
+  "settings": {
+    "number_of_shards": 3
+  },
   "aliases": {
     "zeebe-record-job": {}
   },
@@ -50,6 +53,9 @@
               "enabled": false
             },
             "errorMessage": {
+              "type": "text"
+            },
+            "errorCode": {
               "type": "text"
             }
           }

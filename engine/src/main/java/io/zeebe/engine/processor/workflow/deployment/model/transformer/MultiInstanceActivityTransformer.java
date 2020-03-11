@@ -9,6 +9,7 @@ package io.zeebe.engine.processor.workflow.deployment.model.transformer;
 
 import io.zeebe.engine.processor.workflow.deployment.model.BpmnStep;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableActivity;
+import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableFlowElementContainer;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableLoopCharacteristics;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableMultiInstanceBody;
 import io.zeebe.engine.processor.workflow.deployment.model.element.ExecutableWorkflow;
@@ -26,7 +27,7 @@ import java.util.Collections;
 import java.util.Optional;
 import org.agrona.DirectBuffer;
 
-public class MultiInstanceActivityTransformer implements ModelElementTransformer<Activity> {
+public final class MultiInstanceActivityTransformer implements ModelElementTransformer<Activity> {
   @Override
   public Class<Activity> getType() {
     return Activity.class;
@@ -39,12 +40,11 @@ public class MultiInstanceActivityTransformer implements ModelElementTransformer
         workflow.getElementById(element.getId(), ExecutableActivity.class);
 
     final LoopCharacteristics loopCharacteristics = element.getLoopCharacteristics();
-    if (loopCharacteristics != null
-        && loopCharacteristics instanceof MultiInstanceLoopCharacteristics) {
+    if (loopCharacteristics instanceof MultiInstanceLoopCharacteristics) {
 
       final ExecutableLoopCharacteristics miLoopCharacteristics =
           transformLoopCharacteristics(
-              context, innerActivity, (MultiInstanceLoopCharacteristics) loopCharacteristics);
+              context, (MultiInstanceLoopCharacteristics) loopCharacteristics);
 
       final ExecutableMultiInstanceBody multiInstanceBody =
           new ExecutableMultiInstanceBody(element.getId(), miLoopCharacteristics, innerActivity);
@@ -72,7 +72,13 @@ public class MultiInstanceActivityTransformer implements ModelElementTransformer
 
       // attach boundary events to the multi-instance body
       innerActivity.getBoundaryEvents().forEach(multiInstanceBody::attach);
+      innerActivity.getEventSubprocesses().forEach(multiInstanceBody::attach);
+
       innerActivity.getEvents().removeAll(innerActivity.getBoundaryEvents());
+      innerActivity.getEventSubprocesses().stream()
+          .map(ExecutableFlowElementContainer::getStartEvents)
+          .forEach(innerActivity.getEvents()::remove);
+
       innerActivity.getInterruptingElementIds().clear();
 
       // attach incoming and outgoing sequence flows to the multi-instance body
@@ -90,7 +96,6 @@ public class MultiInstanceActivityTransformer implements ModelElementTransformer
 
   private ExecutableLoopCharacteristics transformLoopCharacteristics(
       final TransformContext context,
-      final ExecutableActivity activity,
       final MultiInstanceLoopCharacteristics elementLoopCharacteristics) {
 
     final boolean isSequential = elementLoopCharacteristics.isSequential();

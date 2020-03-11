@@ -7,15 +7,15 @@
  */
 package io.zeebe.engine.processor.workflow.deployment.model.element;
 
-import io.zeebe.msgpack.el.CompiledJsonCondition;
+import io.zeebe.el.Expression;
 
 public class ExecutableSequenceFlow extends AbstractFlowElement {
 
   private ExecutableFlowNode source;
   private ExecutableFlowNode target;
-  private CompiledJsonCondition condition;
+  private Expression condition;
 
-  public ExecutableSequenceFlow(String id) {
+  public ExecutableSequenceFlow(final String id) {
     super(id);
   }
 
@@ -23,7 +23,7 @@ public class ExecutableSequenceFlow extends AbstractFlowElement {
     return target;
   }
 
-  public void setTarget(ExecutableFlowNode target) {
+  public void setTarget(final ExecutableFlowNode target) {
     this.target = target;
   }
 
@@ -31,15 +31,15 @@ public class ExecutableSequenceFlow extends AbstractFlowElement {
     return source;
   }
 
-  public void setSource(ExecutableFlowNode source) {
+  public void setSource(final ExecutableFlowNode source) {
     this.source = source;
   }
 
-  public CompiledJsonCondition getCondition() {
+  public Expression getCondition() {
     return condition;
   }
 
-  public void setCondition(CompiledJsonCondition condition) {
+  public void setCondition(final Expression condition) {
     this.condition = condition;
   }
 }

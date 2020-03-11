@@ -17,7 +17,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
-public class WorkflowInstanceSubscription implements DbValue {
+public final class WorkflowInstanceSubscription implements DbValue {
 
   private static final int STATE_OPENING = 0;
   private static final int STATE_OPENED = 1;
@@ -26,6 +26,7 @@ public class WorkflowInstanceSubscription implements DbValue {
   private final DirectBuffer messageName = new UnsafeBuffer();
   private final DirectBuffer correlationKey = new UnsafeBuffer();
   private final DirectBuffer targetElementId = new UnsafeBuffer();
+  private final DirectBuffer bpmnProcessId = new UnsafeBuffer();
 
   private long workflowInstanceKey;
   private long elementInstanceKey;
@@ -37,20 +38,25 @@ public class WorkflowInstanceSubscription implements DbValue {
 
   public WorkflowInstanceSubscription() {}
 
-  public WorkflowInstanceSubscription(long workflowInstanceKey, long elementInstanceKey) {
+  public WorkflowInstanceSubscription(
+      final long workflowInstanceKey,
+      final long elementInstanceKey,
+      final DirectBuffer bpmnProcessId) {
     this.workflowInstanceKey = workflowInstanceKey;
     this.elementInstanceKey = elementInstanceKey;
+    this.bpmnProcessId.wrap(bpmnProcessId);
   }
 
   public WorkflowInstanceSubscription(
-      long workflowInstanceKey,
-      long elementInstanceKey,
-      DirectBuffer targetElementId,
-      DirectBuffer messageName,
-      DirectBuffer correlationKey,
-      long commandSentTime,
-      boolean closeOnCorrelate) {
-    this(workflowInstanceKey, elementInstanceKey);
+      final long workflowInstanceKey,
+      final long elementInstanceKey,
+      final DirectBuffer targetElementId,
+      final DirectBuffer bpmnProcessId,
+      final DirectBuffer messageName,
+      final DirectBuffer correlationKey,
+      final long commandSentTime,
+      final boolean closeOnCorrelate) {
+    this(workflowInstanceKey, elementInstanceKey, bpmnProcessId);
 
     this.targetElementId.wrap(targetElementId);
     this.commandSentTime = commandSentTime;
@@ -63,7 +69,7 @@ public class WorkflowInstanceSubscription implements DbValue {
     return messageName;
   }
 
-  public void setMessageName(DirectBuffer messageName) {
+  public void setMessageName(final DirectBuffer messageName) {
     this.messageName.wrap(messageName);
   }
 
@@ -71,7 +77,7 @@ public class WorkflowInstanceSubscription implements DbValue {
     return correlationKey;
   }
 
-  public void setCorrelationKey(DirectBuffer correlationKey) {
+  public void setCorrelationKey(final DirectBuffer correlationKey) {
     this.correlationKey.wrap(correlationKey);
   }
 
@@ -79,7 +85,7 @@ public class WorkflowInstanceSubscription implements DbValue {
     return targetElementId;
   }
 
-  public void setTargetElementId(DirectBuffer targetElementId) {
+  public void setTargetElementId(final DirectBuffer targetElementId) {
     this.targetElementId.wrap(targetElementId);
   }
 
@@ -87,7 +93,7 @@ public class WorkflowInstanceSubscription implements DbValue {
     return workflowInstanceKey;
   }
 
-  public void setWorkflowInstanceKey(long workflowInstanceKey) {
+  public void setWorkflowInstanceKey(final long workflowInstanceKey) {
     this.workflowInstanceKey = workflowInstanceKey;
   }
 
@@ -95,15 +101,23 @@ public class WorkflowInstanceSubscription implements DbValue {
     return elementInstanceKey;
   }
 
-  public void setElementInstanceKey(long elementInstanceKey) {
+  public void setElementInstanceKey(final long elementInstanceKey) {
     this.elementInstanceKey = elementInstanceKey;
+  }
+
+  public DirectBuffer getBpmnProcessId() {
+    return bpmnProcessId;
+  }
+
+  public void setBpmnProcessId(final DirectBuffer bpmnProcessId) {
+    this.bpmnProcessId.wrap(bpmnProcessId);
   }
 
   public long getCommandSentTime() {
     return commandSentTime;
   }
 
-  public void setCommandSentTime(long commandSentTime) {
+  public void setCommandSentTime(final long commandSentTime) {
     this.commandSentTime = commandSentTime;
   }
 
@@ -111,7 +125,7 @@ public class WorkflowInstanceSubscription implements DbValue {
     return subscriptionPartitionId;
   }
 
-  public void setSubscriptionPartitionId(int subscriptionPartitionId) {
+  public void setSubscriptionPartitionId(final int subscriptionPartitionId) {
     this.subscriptionPartitionId = subscriptionPartitionId;
   }
 
@@ -119,7 +133,7 @@ public class WorkflowInstanceSubscription implements DbValue {
     return closeOnCorrelate;
   }
 
-  public void setCloseOnCorrelate(boolean closeOnCorrelate) {
+  public void setCloseOnCorrelate(final boolean closeOnCorrelate) {
     this.closeOnCorrelate = closeOnCorrelate;
   }
 
@@ -142,27 +156,28 @@ public class WorkflowInstanceSubscription implements DbValue {
   @Override
   public void wrap(final DirectBuffer buffer, int offset, final int length) {
     final int startOffset = offset;
-    this.workflowInstanceKey = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
+    workflowInstanceKey = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
     offset += Long.BYTES;
 
-    this.elementInstanceKey = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
+    elementInstanceKey = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
     offset += Long.BYTES;
 
-    this.subscriptionPartitionId = buffer.getInt(offset, ZB_DB_BYTE_ORDER);
+    subscriptionPartitionId = buffer.getInt(offset, ZB_DB_BYTE_ORDER);
     offset += Integer.BYTES;
 
-    this.commandSentTime = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
+    commandSentTime = buffer.getLong(offset, ZB_DB_BYTE_ORDER);
     offset += Long.BYTES;
 
-    this.state = buffer.getInt(offset, ZB_DB_BYTE_ORDER);
+    state = buffer.getInt(offset, ZB_DB_BYTE_ORDER);
     offset += Integer.BYTES;
 
-    this.closeOnCorrelate = buffer.getByte(offset) == 1;
+    closeOnCorrelate = buffer.getByte(offset) == 1;
     offset += 1;
 
     offset = readIntoBuffer(buffer, offset, messageName);
     offset = readIntoBuffer(buffer, offset, correlationKey);
     offset = readIntoBuffer(buffer, offset, targetElementId);
+    offset = readIntoBuffer(buffer, offset, bpmnProcessId);
 
     assert (offset - startOffset) == length : "End offset differs from length";
   }
@@ -171,10 +186,11 @@ public class WorkflowInstanceSubscription implements DbValue {
   public int getLength() {
     return 1
         + Long.BYTES * 3
-        + Integer.BYTES * 5
+        + Integer.BYTES * 6
         + messageName.capacity()
         + correlationKey.capacity()
-        + targetElementId.capacity();
+        + targetElementId.capacity()
+        + bpmnProcessId.capacity();
   }
 
   @Override
@@ -200,6 +216,8 @@ public class WorkflowInstanceSubscription implements DbValue {
     offset = writeIntoBuffer(buffer, offset, messageName);
     offset = writeIntoBuffer(buffer, offset, correlationKey);
     offset = writeIntoBuffer(buffer, offset, targetElementId);
+    offset = writeIntoBuffer(buffer, offset, bpmnProcessId);
+
     assert offset == getLength() : "End offset differs with getLength()";
   }
 

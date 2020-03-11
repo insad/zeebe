@@ -7,55 +7,57 @@
  */
 package io.zeebe.broker.system.configuration;
 
-import io.zeebe.util.Environment;
+import static io.zeebe.util.StringUtil.LIST_SANITIZER;
+
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import org.springframework.util.unit.DataSize;
 
-public class DataCfg implements ConfigurationEntry {
+public final class DataCfg implements ConfigurationEntry {
   public static final String DEFAULT_DIRECTORY = "data";
 
   // Hint: do not use Collections.singletonList as this does not support replaceAll
   private List<String> directories = Arrays.asList(DEFAULT_DIRECTORY);
 
-  private String logSegmentSize = "512M";
+  private DataSize logSegmentSize = DataSize.ofMegabytes(512);
 
-  private String snapshotPeriod = "15m";
-
-  private String raftSegmentSize;
+  private Duration snapshotPeriod = Duration.ofMinutes(15);
 
   private int maxSnapshots = 3;
+  private int logIndexDensity = 100;
 
   @Override
-  public void init(BrokerCfg globalConfig, String brokerBase, Environment environment) {
-    applyEnvironment(environment);
-    directories.replaceAll(d -> ConfigurationUtil.toAbsolutePath(d, brokerBase));
-  }
+  public void init(final BrokerCfg globalConfig, final String brokerBase) {
 
-  private void applyEnvironment(final Environment environment) {
-    environment.getList(EnvironmentConstants.ENV_DIRECTORIES).ifPresent(v -> directories = v);
+    directories.replaceAll(d -> ConfigurationUtil.toAbsolutePath(d, brokerBase));
   }
 
   public List<String> getDirectories() {
     return directories;
   }
 
-  public void setDirectories(List<String> directories) {
-    this.directories = directories;
+  public void setDirectories(final List<String> directories) {
+    this.directories = LIST_SANITIZER.apply(directories);
   }
 
-  public String getLogSegmentSize() {
+  public long getLogSegmentSizeInBytes() {
+    return logSegmentSize.toBytes();
+  }
+
+  public DataSize getLogSegmentSize() {
     return logSegmentSize;
   }
 
-  public void setLogSegmentSize(String logSegmentSize) {
+  public void setLogSegmentSize(final DataSize logSegmentSize) {
     this.logSegmentSize = logSegmentSize;
   }
 
-  public String getSnapshotPeriod() {
+  public Duration getSnapshotPeriod() {
     return snapshotPeriod;
   }
 
-  public void setSnapshotPeriod(final String snapshotPeriod) {
+  public void setSnapshotPeriod(final Duration snapshotPeriod) {
     this.snapshotPeriod = snapshotPeriod;
   }
 
@@ -67,12 +69,12 @@ public class DataCfg implements ConfigurationEntry {
     this.maxSnapshots = maxSnapshots;
   }
 
-  public String getRaftSegmentSize() {
-    return raftSegmentSize;
+  public int getLogIndexDensity() {
+    return logIndexDensity;
   }
 
-  public void setRaftSegmentSize(String raftSegmentSize) {
-    this.raftSegmentSize = raftSegmentSize;
+  public void setLogIndexDensity(int logIndexDensity) {
+    this.logIndexDensity = logIndexDensity;
   }
 
   @Override
@@ -86,11 +88,10 @@ public class DataCfg implements ConfigurationEntry {
         + ", snapshotPeriod='"
         + snapshotPeriod
         + '\''
-        + ", raftSegmentSize='"
-        + raftSegmentSize
-        + '\''
         + ", maxSnapshots="
         + maxSnapshots
+        + ", logIndexDensity="
+        + logIndexDensity
         + '}';
   }
 }

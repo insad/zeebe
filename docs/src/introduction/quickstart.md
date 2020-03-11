@@ -46,7 +46,6 @@ To start a Zeebe broker use the `broker` or `broker.bat` file located in the
 ./bin/broker
 ```
 ```
-23:39:13.167 [] [main] INFO  io.zeebe.util.config - Reading configuration for class class io.zeebe.broker.system.configuration.BrokerCfg from file conf/zeebe.cfg.toml
 23:39:13.246 [] [main] INFO  io.zeebe.broker.system - Scheduler configuration: Threads{cpu-bound: 2, io-bound: 2}.
 23:39:13.270 [] [main] INFO  io.zeebe.broker.system - Version: X.Y.Z
 23:39:13.273 [] [main] INFO  io.zeebe.broker.system - Starting broker with configuration {
@@ -59,7 +58,7 @@ To continue this guide open another terminal to execute commands using the
 Zeebe CLI `zbctl`.
 
 We can now check the status of the Zeebe broker.
-> **Note:** By default, the embedded gateway listens to a plaintext connection but the clients are configured to use TLS. Therefore, all `zbctl` commands in the quickstart will specify the `--insecure` flag. 
+> **Note:** By default, the embedded gateway listens to a plaintext connection but the clients are configured to use TLS. Therefore, all `zbctl` commands in the quickstart will specify the `--insecure` flag.
 
 ```
 ./bin/zbctl --insecure status
@@ -75,14 +74,14 @@ Brokers:
 
 ## Step 3: Deploy a workflow
 
-A [workflow](basics/workflows.html) is used to orchestrate loosely coupled job
+A [workflow](/basics/workflows.html) is used to orchestrate loosely coupled job
 workers and the flow of data between them.
 
 In this guide we will use an example process `order-process.bpmn`. You can
 download it with the following link:
-[order-process.bpmn](introduction/order-process.bpmn).
+[order-process.bpmn](/introduction/order-process.bpmn).
 
-![order-process](introduction/order-process.png)
+![order-process](/introduction/order-process.png)
 
 The process describes a sequential flow of three tasks *Collect Money*, *Fetch
 Items* and *Ship Parcel*. If you open the `order-process.bpmn` file in a text
@@ -223,12 +222,11 @@ If you want to visualize the state of the workflow instances you can start the
 ## Next steps
 
 To continue working with Zeebe we recommend to get more familiar with the basic
-concepts of Zeebe, see the [Basics chapter](basics/README.html) of the
+concepts of Zeebe, see the [Basics chapter](/basics/) of the
 documentation.
 
-In the [BPMN Workflows chapter](bpmn-workflows/README.html) you can find an
-introduction to creating Workflows with BPMN. And the [BPMN Modeler
-chapter](bpmn-modeler/README.html) shows you how to model them by yourself.
+In the [BPMN Workflows chapter](/bpmn-workflows/) you can find an
+introduction to creating Workflows with BPMN.
 
 The documentation also provides getting started guides for implementing job
-workers using [Java](java-client/README.html) or [Go](go-client/README.html).
+workers using [Java](/clients/java-client/) or [Go](/clients/go-client/).

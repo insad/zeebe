@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.zeebe.client.api.command.ClientException;
 import io.zeebe.client.api.response.ActivateJobsResponse;
+import io.zeebe.client.impl.ZeebeObjectMapper;
+import io.zeebe.client.impl.response.ActivatedJobImpl;
 import io.zeebe.client.util.ClientTest;
 import io.zeebe.gateway.protocol.GatewayOuterClass.ActivateJobsRequest;
 import io.zeebe.gateway.protocol.GatewayOuterClass.ActivatedJob;
@@ -29,7 +31,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.junit.Test;
 
-public class ActivateJobsTest extends ClientTest {
+public final class ActivateJobsTest extends ClientTest {
 
   @Test
   public void shouldActivateJobs() {
@@ -76,7 +78,7 @@ public class ActivateJobsTest extends ClientTest {
             .newActivateJobsCommand()
             .jobType("foo")
             .maxJobsToActivate(3)
-            .timeout(1000)
+            .timeout(Duration.ofMillis(1000))
             .workerName("worker1")
             .send()
             .join();
@@ -224,5 +226,37 @@ public class ActivateJobsTest extends ClientTest {
 
     // then
     assertThat(request.getRequestTimeout()).isEqualTo(requestTimeout.toMillis());
+  }
+
+  @Test
+  public void shouldDeserializePartiallyToPojo() {
+    // given
+    final ActivatedJobImpl activatedJob =
+        new ActivatedJobImpl(
+            new ZeebeObjectMapper(),
+            ActivatedJob.newBuilder()
+                .setCustomHeaders("{}")
+                .setVariables("{\"a\": 1, \"b\": 2}")
+                .build());
+
+    // when
+    final VariablesPojo variablesPojo = activatedJob.getVariablesAsType(VariablesPojo.class);
+
+    // then
+    assertThat(variablesPojo.getA()).isEqualTo(1);
+  }
+
+  static class VariablesPojo {
+
+    int a;
+
+    public int getA() {
+      return a;
+    }
+
+    public VariablesPojo setA(final int a) {
+      this.a = a;
+      return this;
+    }
   }
 }

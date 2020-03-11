@@ -1,6 +1,6 @@
 {
   "index_patterns": [
-    "zeebe-record-message-subscription_*"
+    "zeebe-record_message-subscription_*"
   ],
   "order": 20,
   "aliases": {
@@ -26,6 +26,12 @@
             },
             "correlationKey": {
               "type": "text"
+            },
+            "bpmnProcessId": {
+              "type": "keyword"
+            },
+            "messageKey": {
+              "type": "long"
             }
           }
         }

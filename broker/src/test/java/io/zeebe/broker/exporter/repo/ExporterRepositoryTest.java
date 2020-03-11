@@ -27,13 +27,13 @@ import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
-public class ExporterRepositoryTest {
-  private TemporaryFolder temporaryFolder = new TemporaryFolder();
-  private JarCreatorRule jarCreator = new JarCreatorRule(temporaryFolder);
+public final class ExporterRepositoryTest {
+  private final TemporaryFolder temporaryFolder = new TemporaryFolder();
+  private final JarCreatorRule jarCreator = new JarCreatorRule(temporaryFolder);
 
   @Rule public RuleChain chain = RuleChain.outerRule(temporaryFolder).around(jarCreator);
 
-  private ExporterRepository repository = new ExporterRepository();
+  private final ExporterRepository repository = new ExporterRepository();
 
   @Test
   public void shouldCacheDescriptorOnceLoaded() throws ExporterLoadException {
@@ -66,11 +66,10 @@ public class ExporterRepositoryTest {
     // given
     final ExporterCfg config = new ExporterCfg();
     config.setClassName(ControlledTestExporter.class.getCanonicalName());
-    config.setId("controlled");
     config.setJarPath(null);
 
     // when
-    final ExporterDescriptor descriptor = repository.load(config);
+    final ExporterDescriptor descriptor = repository.load("controlled", config);
 
     // then
     assertThat(config.isExternal()).isFalse();
@@ -87,7 +86,6 @@ public class ExporterRepositoryTest {
 
     // when
     config.setClassName(exportedClass.getCanonicalName());
-    config.setId("exported");
     config.setJarPath(jarFile.getAbsolutePath());
     config.setArgs(args);
 
@@ -95,12 +93,12 @@ public class ExporterRepositoryTest {
     args.put("bar", false);
 
     // when
-    final ExporterDescriptor descriptor = repository.load(config);
+    final ExporterDescriptor descriptor = repository.load("exported", config);
 
     // then
     assertThat(config.isExternal()).isTrue();
     assertThat(descriptor.getConfiguration().getArguments()).isEqualTo(config.getArgs());
-    assertThat(descriptor.getConfiguration().getId()).isEqualTo(config.getId());
+    assertThat(descriptor.getConfiguration().getId()).isEqualTo("exported");
     assertThat(descriptor.newInstance().getClass().getCanonicalName())
         .isEqualTo(exportedClass.getCanonicalName());
   }
@@ -115,12 +113,11 @@ public class ExporterRepositoryTest {
 
     // when
     config.setClassName(exportedClass.getCanonicalName());
-    config.setId("exported");
     config.setJarPath(jarFile.getAbsolutePath());
     config.setArgs(args);
 
     // then
-    assertThatThrownBy(() -> repository.load(config))
+    assertThatThrownBy(() -> repository.load("exported", config))
         .isInstanceOf(ExporterLoadException.class)
         .hasCauseInstanceOf(ClassCastException.class);
   }
@@ -135,23 +132,22 @@ public class ExporterRepositoryTest {
 
     // when
     config.setClassName("xyz.i.dont.Exist");
-    config.setId("exported");
     config.setJarPath(jarFile.getAbsolutePath());
     config.setArgs(args);
 
     // then
-    assertThatThrownBy(() -> repository.load(config))
+    assertThatThrownBy(() -> repository.load("exported", config))
         .isInstanceOf(ExporterLoadException.class)
         .hasCauseInstanceOf(ClassNotFoundException.class);
   }
 
   static class InvalidExporter implements Exporter {
     @Override
-    public void configure(Context context) {
+    public void configure(final Context context) {
       throw new IllegalStateException("what");
     }
 
     @Override
-    public void export(Record record) {}
+    public void export(final Record record) {}
   }
 }

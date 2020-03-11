@@ -80,7 +80,7 @@ public class ElasticsearchExporterTest {
     testHarness.export();
 
     // then
-    verify(esClient).putIndexTemplate("foo-bar", ZEEBE_RECORD_TEMPLATE_JSON, "-");
+    verify(esClient).putIndexTemplate("foo-bar", "foo-bar", ZEEBE_RECORD_TEMPLATE_JSON);
 
     verify(esClient).putIndexTemplate(ValueType.DEPLOYMENT);
     verify(esClient).putIndexTemplate(ValueType.ERROR);
@@ -296,11 +296,28 @@ public class ElasticsearchExporterTest {
     assertThat(testHarness.getController().getPosition()).isEqualTo(exported.get(3).getPosition());
   }
 
+  @Test
+  public void shouldNotHandleFlushException() {
+    // given
+    when(esClient.shouldFlush()).thenReturn(true);
+    when(esClient.flush()).thenThrow(new ElasticsearchExporterException("expected"));
+
+    createAndOpenExporter();
+
+    // when
+    assertThatThrownBy(() -> testHarness.export())
+        .isInstanceOf(ElasticsearchExporterException.class)
+        .withFailMessage("expected");
+
+    // then
+    verify(esClient, times(1)).flush();
+  }
+
   private ElasticsearchExporter createExporter() {
     return createExporter(esClient);
   }
 
-  private ElasticsearchExporter createExporter(ElasticsearchClient client) {
+  private ElasticsearchExporter createExporter(final ElasticsearchClient client) {
     return new ElasticsearchExporter() {
       @Override
       protected ElasticsearchClient createClient() {
@@ -309,11 +326,11 @@ public class ElasticsearchExporterTest {
     };
   }
 
-  private void openExporter(ElasticsearchExporter exporter) {
+  private void openExporter(final ElasticsearchExporter exporter) {
     testHarness = new ExporterTestHarness(exporter);
     try {
       testHarness.configure("elasticsearch", config);
-    } catch (Exception e) {
+    } catch (final Exception e) {
       throw new AssertionError("Failed to configure exporter", e);
     }
     testHarness.open();

@@ -10,6 +10,8 @@ package io.zeebe.exporter;
 import io.prometheus.client.Histogram;
 import io.zeebe.protocol.record.Record;
 import io.zeebe.protocol.record.ValueType;
+import io.zeebe.protocol.record.value.VariableRecordValue;
+import io.zeebe.util.VersionUtil;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -43,6 +45,7 @@ public class ElasticsearchClient {
 
   public static final String INDEX_TEMPLATE_FILENAME_PATTERN = "/zeebe-record-%s-template.json";
   public static final String INDEX_DELIMITER = "_";
+  public static final String ALIAS_DELIMITER = "-";
   protected final RestHighLevelClient client;
   private final ElasticsearchExporterConfiguration configuration;
   private final Logger log;
@@ -50,7 +53,8 @@ public class ElasticsearchClient {
   private BulkRequest bulkRequest;
   private ElasticsearchMetrics metrics;
 
-  public ElasticsearchClient(final ElasticsearchExporterConfiguration configuration, Logger log) {
+  public ElasticsearchClient(
+      final ElasticsearchExporterConfiguration configuration, final Logger log) {
     this.configuration = configuration;
     this.log = log;
     this.client = createClient();
@@ -67,10 +71,36 @@ public class ElasticsearchClient {
       metrics = new ElasticsearchMetrics(record.getPartitionId());
     }
 
+    checkRecord(record);
+
     final IndexRequest request =
         new IndexRequest(indexFor(record), typeFor(record), idFor(record))
-            .source(record.toJson(), XContentType.JSON);
+            .source(record.toJson(), XContentType.JSON)
+            .routing(String.valueOf(record.getPartitionId()));
     bulk(request);
+  }
+
+  @SuppressWarnings("unchecked")
+  private void checkRecord(Record<?> record) {
+    if (record.getValueType() == ValueType.VARIABLE) {
+      checkVariableRecordValue((Record<VariableRecordValue>) record);
+    }
+  }
+
+  private void checkVariableRecordValue(Record<VariableRecordValue> record) {
+    final VariableRecordValue value = record.getValue();
+    final int size = value.getValue().getBytes().length;
+
+    if (size > configuration.index.ignoreVariablesAbove) {
+      log.warn(
+          "Variable {key: {}, name: {}, variableScope: {}, workflowInstanceKey: {}} exceeded max size of {} bytes with a size of {} bytes. As a consequence this variable is not index by elasticsearch.",
+          record.getKey(),
+          value.getName(),
+          value.getScopeKey(),
+          value.getWorkflowInstanceKey(),
+          configuration.index.ignoreVariablesAbove,
+          size);
+    }
   }
 
   public void bulk(final IndexRequest indexRequest) {
@@ -86,7 +116,7 @@ public class ElasticsearchClient {
         metrics.recordBulkSize(bulkSize);
         final BulkResponse responses = exportBulk();
         success = checkBulkResponses(responses);
-      } catch (IOException e) {
+      } catch (final IOException e) {
         throw new ElasticsearchExporterException("Failed to flush bulk", e);
       }
 
@@ -100,13 +130,13 @@ public class ElasticsearchClient {
   }
 
   private BulkResponse exportBulk() throws IOException {
-    try (Histogram.Timer timer = metrics.measureFlushDuration()) {
+    try (final Histogram.Timer timer = metrics.measureFlushDuration()) {
       return client.bulk(bulkRequest, RequestOptions.DEFAULT);
     }
   }
 
   private boolean checkBulkResponses(final BulkResponse responses) {
-    for (BulkItemResponse response : responses) {
+    for (final BulkItemResponse response : responses) {
       if (response.isFailed()) {
         log.warn("Failed to flush at least one bulk request {}", response.getFailureMessage());
         return false;
@@ -123,31 +153,33 @@ public class ElasticsearchClient {
   /** @return true if request was acknowledged */
   public boolean putIndexTemplate(final ValueType valueType) {
     final String templateName = indexPrefixForValueType(valueType);
+    final String aliasName = aliasNameForValueType(valueType);
     final String filename = indexTemplateForValueType(valueType);
-    return putIndexTemplate(templateName, filename, INDEX_DELIMITER);
+    return putIndexTemplate(templateName, aliasName, filename);
   }
 
   /** @return true if request was acknowledged */
   public boolean putIndexTemplate(
-      final String templateName, final String filename, final String indexDelimiter) {
+      final String templateName, final String aliasName, final String filename) {
     final Map<String, Object> template;
-    try (InputStream inputStream = ElasticsearchExporter.class.getResourceAsStream(filename)) {
+    try (final InputStream inputStream =
+        ElasticsearchExporter.class.getResourceAsStream(filename)) {
       if (inputStream != null) {
         template = XContentHelper.convertToMap(XContentType.JSON.xContent(), inputStream, true);
       } else {
         throw new ElasticsearchExporterException(
             "Failed to find index template in classpath " + filename);
       }
-    } catch (IOException e) {
+    } catch (final IOException e) {
       throw new ElasticsearchExporterException(
           "Failed to load index template from classpath " + filename, e);
     }
 
     // update prefix in template in case it was changed in configuration
-    template.put("index_patterns", Collections.singletonList(templateName + indexDelimiter + "*"));
+    template.put("index_patterns", Collections.singletonList(templateName + INDEX_DELIMITER + "*"));
 
     // update alias in template in case it was changed in configuration
-    template.put("aliases", Collections.singletonMap(templateName, Collections.EMPTY_MAP));
+    template.put("aliases", Collections.singletonMap(aliasName, Collections.EMPTY_MAP));
 
     final PutIndexTemplateRequest request =
         new PutIndexTemplateRequest(templateName).source(template);
@@ -162,7 +194,7 @@ public class ElasticsearchClient {
           .indices()
           .putTemplate(putIndexTemplateRequest, RequestOptions.DEFAULT)
           .isAcknowledged();
-    } catch (IOException e) {
+    } catch (final IOException e) {
       throw new ElasticsearchExporterException("Failed to put index template", e);
     }
   }
@@ -177,7 +209,7 @@ public class ElasticsearchClient {
     return new RestHighLevelClient(builder);
   }
 
-  private HttpAsyncClientBuilder setHttpClientConfigCallback(HttpAsyncClientBuilder builder) {
+  private HttpAsyncClientBuilder setHttpClientConfigCallback(final HttpAsyncClientBuilder builder) {
     builder.setDefaultIOReactorConfig(IOReactorConfig.custom().setIoThreadCount(1).build());
 
     if (configuration.authentication.isPresent()) {
@@ -187,7 +219,7 @@ public class ElasticsearchClient {
     return builder;
   }
 
-  private void setupBasicAuthentication(HttpAsyncClientBuilder builder) {
+  private void setupBasicAuthentication(final HttpAsyncClientBuilder builder) {
     final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
     credentialsProvider.setCredentials(
         AuthScope.ANY,
@@ -201,7 +233,7 @@ public class ElasticsearchClient {
     final URI uri;
     try {
       uri = new URI(url);
-    } catch (URISyntaxException e) {
+    } catch (final URISyntaxException e) {
       throw new ElasticsearchExporterException("Failed to parse url " + url, e);
     }
 
@@ -210,8 +242,7 @@ public class ElasticsearchClient {
 
   protected String indexFor(final Record<?> record) {
     final Instant timestamp = Instant.ofEpochMilli(record.getTimestamp());
-    return indexPrefixForValueType(record.getValueType())
-        + INDEX_DELIMITER
+    return indexPrefixForValueTypeWithDelimiter(record.getValueType())
         + formatter.format(timestamp);
   }
 
@@ -223,8 +254,21 @@ public class ElasticsearchClient {
     return "_doc";
   }
 
+  protected String indexPrefixForValueTypeWithDelimiter(final ValueType valueType) {
+    return indexPrefixForValueType(valueType) + INDEX_DELIMITER;
+  }
+
+  private String aliasNameForValueType(final ValueType valueType) {
+    return configuration.index.prefix + ALIAS_DELIMITER + valueTypeToString(valueType);
+  }
+
   private String indexPrefixForValueType(final ValueType valueType) {
-    return configuration.index.prefix + "-" + valueTypeToString(valueType);
+    final String version = VersionUtil.getVersionLowerCase();
+    return configuration.index.prefix
+        + INDEX_DELIMITER
+        + valueTypeToString(valueType)
+        + INDEX_DELIMITER
+        + version;
   }
 
   private static String valueTypeToString(final ValueType valueType) {

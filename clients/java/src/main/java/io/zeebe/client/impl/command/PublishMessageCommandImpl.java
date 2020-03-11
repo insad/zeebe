@@ -22,16 +22,17 @@ import io.zeebe.client.api.command.FinalCommandStep;
 import io.zeebe.client.api.command.PublishMessageCommandStep1;
 import io.zeebe.client.api.command.PublishMessageCommandStep1.PublishMessageCommandStep2;
 import io.zeebe.client.api.command.PublishMessageCommandStep1.PublishMessageCommandStep3;
+import io.zeebe.client.api.response.PublishMessageResponse;
 import io.zeebe.client.impl.RetriableClientFutureImpl;
 import io.zeebe.client.impl.ZeebeObjectMapper;
 import io.zeebe.gateway.protocol.GatewayGrpc.GatewayStub;
+import io.zeebe.gateway.protocol.GatewayOuterClass;
 import io.zeebe.gateway.protocol.GatewayOuterClass.PublishMessageRequest;
-import io.zeebe.gateway.protocol.GatewayOuterClass.PublishMessageResponse;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
-public class PublishMessageCommandImpl extends CommandWithVariables<PublishMessageCommandImpl>
+public final class PublishMessageCommandImpl extends CommandWithVariables<PublishMessageCommandImpl>
     implements PublishMessageCommandStep1, PublishMessageCommandStep2, PublishMessageCommandStep3 {
 
   private final GatewayStub asyncStub;
@@ -42,8 +43,8 @@ public class PublishMessageCommandImpl extends CommandWithVariables<PublishMessa
   public PublishMessageCommandImpl(
       final GatewayStub asyncStub,
       final ZeebeClientConfiguration configuration,
-      ZeebeObjectMapper objectMapper,
-      Predicate<Throwable> retryPredicate) {
+      final ZeebeObjectMapper objectMapper,
+      final Predicate<Throwable> retryPredicate) {
     super(objectMapper);
     this.asyncStub = asyncStub;
     this.retryPredicate = retryPredicate;
@@ -53,7 +54,7 @@ public class PublishMessageCommandImpl extends CommandWithVariables<PublishMessa
   }
 
   @Override
-  protected PublishMessageCommandImpl setVariablesInternal(String variables) {
+  protected PublishMessageCommandImpl setVariablesInternal(final String variables) {
     builder.setVariables(variables);
     return this;
   }
@@ -83,24 +84,27 @@ public class PublishMessageCommandImpl extends CommandWithVariables<PublishMessa
   }
 
   @Override
-  public FinalCommandStep<Void> requestTimeout(Duration requestTimeout) {
+  public FinalCommandStep<PublishMessageResponse> requestTimeout(final Duration requestTimeout) {
     this.requestTimeout = requestTimeout;
     return this;
   }
 
   @Override
-  public ZeebeFuture<Void> send() {
+  public ZeebeFuture<PublishMessageResponse> send() {
     final PublishMessageRequest request = builder.build();
-    final RetriableClientFutureImpl<Void, PublishMessageResponse> future =
-        new RetriableClientFutureImpl<>(
-            retryPredicate, streamObserver -> send(request, streamObserver));
+    final RetriableClientFutureImpl<
+            PublishMessageResponse, GatewayOuterClass.PublishMessageResponse>
+        future =
+            new RetriableClientFutureImpl<>(
+                retryPredicate, streamObserver -> send(request, streamObserver));
 
     send(request, future);
     return future;
   }
 
   private void send(
-      PublishMessageRequest request, StreamObserver<PublishMessageResponse> streamObserver) {
+      final PublishMessageRequest request,
+      final StreamObserver<GatewayOuterClass.PublishMessageResponse> streamObserver) {
     asyncStub
         .withDeadlineAfter(requestTimeout.toMillis(), TimeUnit.MILLISECONDS)
         .publishMessage(request, streamObserver);

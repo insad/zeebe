@@ -12,7 +12,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
-public class RejectCorrelateMessageSubscriptionCommand
+public final class RejectCorrelateMessageSubscriptionCommand
     extends SbeBufferWriterReader<
         RejectCorrelateMessageSubscriptionEncoder, RejectCorrelateMessageSubscriptionDecoder> {
 
@@ -22,6 +22,7 @@ public class RejectCorrelateMessageSubscriptionCommand
       new RejectCorrelateMessageSubscriptionDecoder();
   private final UnsafeBuffer messageName = new UnsafeBuffer(0, 0);
   private final UnsafeBuffer correlationKey = new UnsafeBuffer(0, 0);
+  private final UnsafeBuffer bpmnProcessId = new UnsafeBuffer(0, 0);
   private int subscriptionPartitionId;
   private long workflowInstanceKey;
   private long messageKey;
@@ -44,6 +45,7 @@ public class RejectCorrelateMessageSubscriptionCommand
     messageKey = RejectCorrelateMessageSubscriptionDecoder.messageKeyNullValue();
     messageName.wrap(0, 0);
     correlationKey.wrap(0, 0);
+    bpmnProcessId.wrap(0, 0);
   }
 
   @Override
@@ -52,11 +54,13 @@ public class RejectCorrelateMessageSubscriptionCommand
         + RejectCorrelateMessageSubscriptionDecoder.messageNameHeaderLength()
         + messageName.capacity()
         + RejectCorrelateMessageSubscriptionDecoder.correlationKeyHeaderLength()
-        + correlationKey.capacity();
+        + correlationKey.capacity()
+        + RejectCorrelateMessageSubscriptionDecoder.bpmnProcessIdHeaderLength()
+        + bpmnProcessId.capacity();
   }
 
   @Override
-  public void write(MutableDirectBuffer buffer, int offset) {
+  public void write(final MutableDirectBuffer buffer, final int offset) {
     super.write(buffer, offset);
 
     encoder
@@ -64,11 +68,12 @@ public class RejectCorrelateMessageSubscriptionCommand
         .workflowInstanceKey(workflowInstanceKey)
         .messageKey(messageKey)
         .putMessageName(messageName, 0, messageName.capacity())
-        .putCorrelationKey(correlationKey, 0, correlationKey.capacity());
+        .putCorrelationKey(correlationKey, 0, correlationKey.capacity())
+        .putBpmnProcessId(bpmnProcessId, 0, bpmnProcessId.capacity());
   }
 
   @Override
-  public void wrap(DirectBuffer buffer, int offset, int length) {
+  public void wrap(final DirectBuffer buffer, final int offset, final int length) {
     super.wrap(buffer, offset, length);
 
     subscriptionPartitionId = decoder.subscriptionPartitionId();
@@ -77,13 +82,14 @@ public class RejectCorrelateMessageSubscriptionCommand
 
     decoder.wrapMessageName(messageName);
     decoder.wrapCorrelationKey(correlationKey);
+    decoder.wrapBpmnProcessId(bpmnProcessId);
   }
 
   public int getSubscriptionPartitionId() {
     return subscriptionPartitionId;
   }
 
-  public void setSubscriptionPartitionId(int subscriptionPartitionId) {
+  public void setSubscriptionPartitionId(final int subscriptionPartitionId) {
     this.subscriptionPartitionId = subscriptionPartitionId;
   }
 
@@ -91,7 +97,7 @@ public class RejectCorrelateMessageSubscriptionCommand
     return workflowInstanceKey;
   }
 
-  public void setWorkflowInstanceKey(long workflowInstanceKey) {
+  public void setWorkflowInstanceKey(final long workflowInstanceKey) {
     this.workflowInstanceKey = workflowInstanceKey;
   }
 
@@ -109,5 +115,9 @@ public class RejectCorrelateMessageSubscriptionCommand
 
   public DirectBuffer getCorrelationKey() {
     return correlationKey;
+  }
+
+  public DirectBuffer getBpmnProcessId() {
+    return bpmnProcessId;
   }
 }

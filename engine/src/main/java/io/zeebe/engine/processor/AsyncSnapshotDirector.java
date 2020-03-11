@@ -10,15 +10,17 @@ package io.zeebe.engine.processor;
 import io.zeebe.logstreams.impl.Loggers;
 import io.zeebe.logstreams.log.LogStream;
 import io.zeebe.logstreams.spi.SnapshotController;
+import io.zeebe.logstreams.state.Snapshot;
 import io.zeebe.util.sched.Actor;
 import io.zeebe.util.sched.ActorCondition;
 import io.zeebe.util.sched.SchedulingHints;
 import io.zeebe.util.sched.future.ActorFuture;
 import io.zeebe.util.sched.future.CompletableActorFuture;
 import java.time.Duration;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 
-public class AsyncSnapshotDirector extends Actor {
+public final class AsyncSnapshotDirector extends Actor {
 
   private static final Logger LOG = Loggers.SNAPSHOT_LOGGER;
   private static final String LOG_MSG_WAIT_UNTIL_COMMITTED =
@@ -34,36 +36,37 @@ public class AsyncSnapshotDirector extends Actor {
   private static final String ERROR_MSG_ENFORCED_SNAPSHOT =
       "Unexpected exception occurred on creating snapshot, was enforced to do so.";
 
-  private static final int INITIAL_POSITION = -1;
   private final SnapshotController snapshotController;
   private final LogStream logStream;
-  private final String name;
   private final Duration snapshotRate;
   private final String processorName;
   private final StreamProcessor streamProcessor;
   private ActorCondition commitCondition;
-  private long lastWrittenEventPosition = INITIAL_POSITION;
-  private boolean pendingSnapshot;
+  private Long lastWrittenEventPosition;
+  private Snapshot pendingSnapshot;
   private long lowerBoundSnapshotPosition;
   private long lastValidSnapshotPosition;
+  private boolean takingSnapshot;
   private final Runnable prepareTakingSnapshot = this::prepareTakingSnapshot;
+  private final String actorName;
 
   public AsyncSnapshotDirector(
-      StreamProcessor streamProcessor,
-      SnapshotController snapshotController,
-      LogStream logStream,
-      Duration snapshotRate) {
+      final int nodeId,
+      final StreamProcessor streamProcessor,
+      final SnapshotController snapshotController,
+      final LogStream logStream,
+      final Duration snapshotRate) {
     this.streamProcessor = streamProcessor;
     this.snapshotController = snapshotController;
     this.logStream = logStream;
     this.processorName = streamProcessor.getName();
-    this.name = processorName + "-snapshot-director";
     this.snapshotRate = snapshotRate;
+    this.actorName = buildActorName(nodeId, "SnapshotDirector-" + logStream.getPartitionId());
   }
 
   @Override
   public String getName() {
-    return name;
+    return actorName;
   }
 
   @Override
@@ -71,13 +74,23 @@ public class AsyncSnapshotDirector extends Actor {
     actor.setSchedulingHints(SchedulingHints.ioBound());
     actor.runAtFixedRate(snapshotRate, prepareTakingSnapshot);
 
+    lastWrittenEventPosition = null;
     commitCondition = actor.onCondition(getConditionNameForPosition(), this::onCommitCheck);
     logStream.registerOnCommitPositionUpdatedCondition(commitCondition);
 
-    lastValidSnapshotPosition = snapshotController.getLastValidSnapshotPosition();
-    LOG.debug(
-        "The position of the last valid snapshot is '{}'. Taking snapshots beyond this position.",
-        lastValidSnapshotPosition);
+    lastValidSnapshotPosition = -1;
+    actor.runOnCompletionBlockingCurrentPhase(
+        streamProcessor.getLastProcessedPositionAsync(),
+        (position, error) -> {
+          if (error == null) {
+            lastValidSnapshotPosition = position;
+            LOG.debug(
+                "The position of the last valid snapshot is '{}'. Taking snapshots beyond this position.",
+                lastValidSnapshotPosition);
+          } else {
+            LOG.error(ERROR_MSG_ON_RESOLVE_PROCESSED_POS, error);
+          }
+        });
   }
 
   @Override
@@ -85,104 +98,9 @@ public class AsyncSnapshotDirector extends Actor {
     logStream.removeOnCommitPositionUpdatedCondition(commitCondition);
   }
 
-  private String getConditionNameForPosition() {
-    return getName() + "-wait-for-endPosition-committed";
-  }
-
-  private void prepareTakingSnapshot() {
-    if (pendingSnapshot) {
-      return;
-    }
-
-    final ActorFuture<Long> lastProcessedPosition = streamProcessor.getLastProcessedPositionAsync();
-    actor.runOnCompletion(
-        lastProcessedPosition,
-        (lowerBoundSnapshotPosition, error) -> {
-          if (error == null) {
-            if (lowerBoundSnapshotPosition > lastValidSnapshotPosition) {
-              this.lowerBoundSnapshotPosition = lowerBoundSnapshotPosition;
-              takeSnapshot();
-            } else {
-              LOG.debug(
-                  "No changes since last snapshot we will skip snapshot creation. Last valid snapshot position {}, new lower bound position {}",
-                  lastValidSnapshotPosition,
-                  lowerBoundSnapshotPosition);
-            }
-
-          } else {
-            LOG.error(ERROR_MSG_ON_RESOLVE_PROCESSED_POS, error);
-          }
-        });
-  }
-
-  private void takeSnapshot() {
-    pendingSnapshot = true;
-    createSnapshot(snapshotController::takeTempSnapshot);
-
-    final ActorFuture<Long> lastWrittenPosition = streamProcessor.getLastWrittenPositionAsync();
-    actor.runOnCompletion(
-        lastWrittenPosition,
-        (endPosition, error) -> {
-          if (error == null) {
-            final long commitPosition = logStream.getCommitPosition();
-            lastWrittenEventPosition = endPosition;
-
-            LOG.debug(LOG_MSG_WAIT_UNTIL_COMMITTED, endPosition, commitPosition);
-            onCommitCheck();
-
-          } else {
-            pendingSnapshot = false;
-            LOG.error(ERROR_MSG_ON_RESOLVE_WRITTEN_POS, error);
-          }
-        });
-  }
-
-  private void createSnapshot(Runnable snapshotCreation) {
-    final long start = System.currentTimeMillis();
-    snapshotCreation.run();
-
-    final long end = System.currentTimeMillis();
-    final long snapshotCreationTime = end - start;
-
-    LOG.debug("Creation of snapshot for {} took {} ms.", processorName, snapshotCreationTime);
-  }
-
-  private void onCommitCheck() {
-    final long currentCommitPosition = logStream.getCommitPosition();
-
-    if (pendingSnapshot && currentCommitPosition >= lastWrittenEventPosition) {
-      try {
-
-        lastValidSnapshotPosition = lowerBoundSnapshotPosition;
-        snapshotController.moveValidSnapshot(lowerBoundSnapshotPosition);
-        snapshotController.replicateLatestSnapshot(actor::submit);
-
-      } catch (Exception ex) {
-        LOG.error(ERROR_MSG_MOVE_SNAPSHOT, ex);
-      } finally {
-        pendingSnapshot = false;
-      }
-    }
-  }
-
-  protected void enforceSnapshotCreation(
-      final long lastWrittenPosition, final long lastProcessedPosition) {
-    final long commitPosition = logStream.getCommitPosition();
-
-    if (commitPosition >= lastWrittenPosition
-        && lastProcessedPosition > lastValidSnapshotPosition) {
-
-      LOG.debug(LOG_MSG_ENFORCE_SNAPSHOT, lastProcessedPosition);
-      try {
-        createSnapshot(() -> snapshotController.takeSnapshot(lastProcessedPosition));
-      } catch (Exception ex) {
-        LOG.error(ERROR_MSG_ENFORCED_SNAPSHOT, ex);
-      }
-    }
-  }
-
+  @Override
   public ActorFuture<Void> closeAsync() {
-    final CompletableActorFuture<Void> future = new CompletableActorFuture();
+    final CompletableActorFuture<Void> future = new CompletableActorFuture<>();
 
     actor.call(
         () ->
@@ -194,19 +112,34 @@ public class AsyncSnapshotDirector extends Actor {
                         streamProcessor.getLastProcessedPositionAsync(),
                         (processedPosition, ex2) -> {
                           if (ex2 == null) {
-                            enforceSnapshotCreation(writtenPosition, processedPosition);
-                            close();
-                            future.complete(null);
+
+                            logStream
+                                .getCommitPositionAsync()
+                                .onComplete(
+                                    (commitPosition, errorOnRetrieveCommitPos) -> {
+                                      if (errorOnRetrieveCommitPos == null) {
+                                        enforceSnapshotCreation(
+                                            commitPosition, writtenPosition, processedPosition);
+                                        super.closeAsync();
+                                        future.complete(null);
+                                      } else {
+                                        LOG.error(
+                                            "Unexpected error on retrieving commit position", ex2);
+                                        future.completeExceptionally(errorOnRetrieveCommitPos);
+                                        super.closeAsync();
+                                      }
+                                    });
+
                           } else {
                             LOG.error(ERROR_MSG_ON_RESOLVE_PROCESSED_POS, ex2);
-                            close();
+                            super.closeAsync();
                             future.completeExceptionally(ex2);
                           }
                         });
 
                   } else {
                     LOG.error(ERROR_MSG_ON_RESOLVE_WRITTEN_POS, ex1);
-                    close();
+                    super.closeAsync();
                     future.completeExceptionally(ex1);
                   }
                 }));
@@ -214,7 +147,117 @@ public class AsyncSnapshotDirector extends Actor {
     return future;
   }
 
-  private void close() {
-    actor.close();
+  private String getConditionNameForPosition() {
+    return getName() + "-wait-for-endPosition-committed";
+  }
+
+  private void prepareTakingSnapshot() {
+    if (takingSnapshot) {
+      return;
+    }
+
+    takingSnapshot = true;
+    final var futureLastProcessedPosition = streamProcessor.getLastProcessedPositionAsync();
+    actor.runOnCompletion(
+        futureLastProcessedPosition,
+        (lastProcessedPosition, error) -> {
+          if (error == null) {
+            if (lastProcessedPosition > lastValidSnapshotPosition) {
+              this.lowerBoundSnapshotPosition = lastProcessedPosition;
+              takeSnapshot();
+            } else {
+              LOG.debug(
+                  "No changes since last snapshot we will skip snapshot creation. Last valid snapshot position {}, new lower bound position {}",
+                  lastValidSnapshotPosition,
+                  lastProcessedPosition);
+              takingSnapshot = false;
+            }
+
+          } else {
+            LOG.error(ERROR_MSG_ON_RESOLVE_PROCESSED_POS, error);
+            takingSnapshot = false;
+          }
+        });
+  }
+
+  private void takeSnapshot() {
+    final var tempSnapshotPosition = lowerBoundSnapshotPosition;
+
+    logStream
+        .getCommitPositionAsync()
+        .onComplete(
+            (commitPosition, errorOnRetrievingCommitPosition) -> {
+              if (errorOnRetrievingCommitPosition == null) {
+                pendingSnapshot =
+                    createSnapshot(() -> snapshotController.takeTempSnapshot(tempSnapshotPosition));
+                LOG.info(LOG_MSG_WAIT_UNTIL_COMMITTED, tempSnapshotPosition, commitPosition);
+
+                final ActorFuture<Long> lastWrittenPosition =
+                    streamProcessor.getLastWrittenPositionAsync();
+                actor.runOnCompletion(
+                    lastWrittenPosition,
+                    (endPosition, error) -> {
+                      if (error == null) {
+                        lastWrittenEventPosition = endPosition;
+                        onCommitCheck();
+                      } else {
+                        lastWrittenEventPosition = null;
+                        takingSnapshot = false;
+                        pendingSnapshot = null;
+                        LOG.error(ERROR_MSG_ON_RESOLVE_WRITTEN_POS, error);
+                      }
+                    });
+              } else {
+                takingSnapshot = false;
+                LOG.error(
+                    "Unexpected error on retrieving commit position",
+                    errorOnRetrievingCommitPosition);
+              }
+            });
+  }
+
+  private Snapshot createSnapshot(final Supplier<Snapshot> snapshotCreation) {
+    final var snapshot = snapshotCreation.get();
+    LOG.debug("Created snapshot for {}", processorName);
+    return snapshot;
+  }
+
+  private void onCommitCheck() {
+    logStream
+        .getCommitPositionAsync()
+        .onComplete(
+            (currentCommitPosition, error) -> {
+              if (pendingSnapshot != null
+                  && lastWrittenEventPosition != null
+                  && currentCommitPosition >= lastWrittenEventPosition) {
+                try {
+                  lastValidSnapshotPosition = lowerBoundSnapshotPosition;
+                  snapshotController.commitSnapshot(pendingSnapshot);
+                  snapshotController.replicateLatestSnapshot(actor::submit);
+
+                } catch (final Exception ex) {
+                  LOG.error(ERROR_MSG_MOVE_SNAPSHOT, ex);
+                } finally {
+                  lastWrittenEventPosition = null;
+                  takingSnapshot = false;
+                  pendingSnapshot = null;
+                }
+              }
+            });
+  }
+
+  void enforceSnapshotCreation(
+      final long commitPosition, final long lastWrittenPosition, final long lastProcessedPosition) {
+    if (commitPosition >= lastWrittenPosition
+        && lastProcessedPosition > lastValidSnapshotPosition) {
+
+      LOG.debug(LOG_MSG_ENFORCE_SNAPSHOT, lastProcessedPosition);
+      try {
+        snapshotController.takeSnapshot(lastProcessedPosition);
+        LOG.debug("Created snapshot for {}", processorName);
+      } catch (final Exception ex) {
+        LOG.error(ERROR_MSG_ENFORCED_SNAPSHOT, ex);
+      }
+    }
   }
 }

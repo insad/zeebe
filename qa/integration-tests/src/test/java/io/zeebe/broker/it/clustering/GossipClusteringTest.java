@@ -9,21 +9,20 @@ package io.zeebe.broker.it.clustering;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.zeebe.broker.it.GrpcClientRule;
+import io.zeebe.broker.it.util.GrpcClientRule;
 import io.zeebe.client.api.response.BrokerInfo;
-import io.zeebe.transport.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.List;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.rules.Timeout;
 
-public class GossipClusteringTest {
-  private static final int PARTITION_COUNT = 3;
+public final class GossipClusteringTest {
 
-  public Timeout testTimeout = Timeout.seconds(120);
-  public ClusteringRule clusteringRule = new ClusteringRule();
-  public GrpcClientRule clientRule = new GrpcClientRule(clusteringRule);
+  public final Timeout testTimeout = Timeout.seconds(120);
+  public final ClusteringRule clusteringRule = new ClusteringRule(1, 3, 3);
+  public final GrpcClientRule clientRule = new GrpcClientRule(clusteringRule);
 
   @Rule
   public RuleChain ruleChain =
@@ -34,7 +33,7 @@ public class GossipClusteringTest {
     // given
 
     // when
-    final List<SocketAddress> topologyBrokers = clusteringRule.getBrokersInCluster();
+    final List<InetSocketAddress> topologyBrokers = clusteringRule.getBrokersInCluster();
 
     // then
     assertThat(topologyBrokers).hasSize(3);
@@ -44,19 +43,19 @@ public class GossipClusteringTest {
   public void shouldDistributePartitionsAndLeaderInformationInCluster() {
     // then
     final long partitionLeaderCount = clusteringRule.getPartitionLeaderCount();
-    assertThat(partitionLeaderCount).isEqualTo(PARTITION_COUNT);
+    assertThat(partitionLeaderCount).isEqualTo(1);
   }
 
   @Test
   public void shouldRemoveMemberFromTopology() {
     // given
-    final SocketAddress[] otherBrokers = clusteringRule.getOtherBrokers(2);
+    final InetSocketAddress[] otherBrokers = clusteringRule.getOtherBrokers(2);
 
     // when
     clusteringRule.stopBroker(2);
 
     // then
-    final List<SocketAddress> topologyBrokers = clusteringRule.getBrokersInCluster();
+    final List<InetSocketAddress> topologyBrokers = clusteringRule.getBrokersInCluster();
 
     assertThat(topologyBrokers).containsExactlyInAnyOrder(otherBrokers);
   }
@@ -65,14 +64,14 @@ public class GossipClusteringTest {
   public void shouldRemoveLeaderFromCluster() {
     // given
     final BrokerInfo leaderForPartition = clusteringRule.getLeaderForPartition(1);
-    final SocketAddress[] otherBrokers =
-        clusteringRule.getOtherBrokers(leaderForPartition.getAddress());
+    final InetSocketAddress[] otherBrokers =
+        clusteringRule.getOtherBrokers(leaderForPartition.getNodeId());
 
     // when
     clusteringRule.stopBroker(leaderForPartition.getNodeId());
 
     // then
-    final List<SocketAddress> topologyBrokers = clusteringRule.getBrokersInCluster();
+    final List<InetSocketAddress> topologyBrokers = clusteringRule.getBrokersInCluster();
 
     assertThat(topologyBrokers).containsExactlyInAnyOrder(otherBrokers);
   }
@@ -83,7 +82,7 @@ public class GossipClusteringTest {
     clusteringRule.restartBroker(2);
 
     // then
-    final List<SocketAddress> topologyBrokers = clusteringRule.getBrokersInCluster();
+    final List<InetSocketAddress> topologyBrokers = clusteringRule.getBrokersInCluster();
 
     assertThat(topologyBrokers).hasSize(3);
   }

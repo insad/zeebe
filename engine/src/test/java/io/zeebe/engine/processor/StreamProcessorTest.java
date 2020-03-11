@@ -20,12 +20,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import io.zeebe.engine.state.ZeebeState;
 import io.zeebe.engine.util.StreamProcessorRule;
+import io.zeebe.logstreams.state.Snapshot;
 import io.zeebe.logstreams.state.StateSnapshotController;
 import io.zeebe.protocol.impl.record.UnifiedRecordValue;
-import io.zeebe.protocol.impl.record.value.error.ErrorRecord;
 import io.zeebe.protocol.impl.record.value.workflowinstance.WorkflowInstanceRecord;
 import io.zeebe.protocol.record.Record;
 import io.zeebe.protocol.record.RecordType;
@@ -47,13 +48,13 @@ import org.mockito.InOrder;
 import org.mockito.Mockito;
 import org.mockito.verification.VerificationWithTimeout;
 
-public class StreamProcessorTest {
+public final class StreamProcessorTest {
 
   private static final Duration SNAPSHOT_INTERVAL = Duration.ofMinutes(1);
   private static final long TIMEOUT_MILLIS = 2_000L;
   private static final VerificationWithTimeout TIMEOUT = timeout(TIMEOUT_MILLIS);
 
-  @Rule public StreamProcessorRule streamProcessorRule = new StreamProcessorRule();
+  @Rule public final StreamProcessorRule streamProcessorRule = new StreamProcessorRule();
   private ActorControl processingContextActor;
 
   @Test
@@ -68,7 +69,7 @@ public class StreamProcessorTest {
                 .withListener(
                     new StreamProcessorLifecycleAware() {
                       @Override
-                      public void onRecovered(ReadonlyProcessingContext context) {
+                      public void onRecovered(final ReadonlyProcessingContext context) {
                         recoveredLatch.countDown();
                       }
                     }));
@@ -79,7 +80,6 @@ public class StreamProcessorTest {
 
     // then
     final InOrder inOrder = inOrder(lifecycleAware);
-    inOrder.verify(lifecycleAware, times(1)).onOpen(any());
     inOrder.verify(lifecycleAware, times(1)).onRecovered(any());
     inOrder.verify(lifecycleAware, times(1)).onClose();
 
@@ -98,7 +98,7 @@ public class StreamProcessorTest {
                 .withListener(
                     new StreamProcessorLifecycleAware() {
                       @Override
-                      public void onRecovered(ReadonlyProcessingContext context) {
+                      public void onRecovered(final ReadonlyProcessingContext context) {
                         recoveredLatch.countDown();
                       }
                     }));
@@ -109,7 +109,6 @@ public class StreamProcessorTest {
 
     // then
     final InOrder inOrder = inOrder(typedRecordProcessor);
-    inOrder.verify(typedRecordProcessor, times(1)).onOpen(any());
     inOrder.verify(typedRecordProcessor, times(1)).onRecovered(any());
     inOrder.verify(typedRecordProcessor, times(1)).onClose();
 
@@ -133,7 +132,6 @@ public class StreamProcessorTest {
 
     // then
     final InOrder inOrder = inOrder(typedRecordProcessor);
-    inOrder.verify(typedRecordProcessor, TIMEOUT.times(1)).onOpen(any());
     inOrder.verify(typedRecordProcessor, TIMEOUT.times(1)).onRecovered(any());
     inOrder
         .verify(typedRecordProcessor, TIMEOUT.times(1))
@@ -172,7 +170,6 @@ public class StreamProcessorTest {
 
     // then
     final InOrder inOrder = inOrder(typedRecordProcessor);
-    inOrder.verify(typedRecordProcessor, TIMEOUT.times(1)).onOpen(any());
     inOrder.verify(typedRecordProcessor, TIMEOUT.times(1)).onRecovered(any());
     inOrder
         .verify(typedRecordProcessor, TIMEOUT.times(2))
@@ -200,7 +197,6 @@ public class StreamProcessorTest {
 
     // then
     final InOrder inOrder = inOrder(typedRecordProcessor);
-    inOrder.verify(typedRecordProcessor, TIMEOUT.times(1)).onOpen(any());
     inOrder.verify(typedRecordProcessor, TIMEOUT.times(1)).onRecovered(any());
     inOrder
         .verify(typedRecordProcessor, TIMEOUT.times(1))
@@ -224,11 +220,11 @@ public class StreamProcessorTest {
                     new TypedRecordProcessor<UnifiedRecordValue>() {
                       @Override
                       public void processRecord(
-                          long position,
-                          TypedRecord<UnifiedRecordValue> record,
-                          TypedResponseWriter responseWriter,
-                          TypedStreamWriter streamWriter,
-                          Consumer<SideEffectProducer> sideEffect) {
+                          final long position,
+                          final TypedRecord<UnifiedRecordValue> record,
+                          final TypedResponseWriter responseWriter,
+                          final TypedStreamWriter streamWriter,
+                          final Consumer<SideEffectProducer> sideEffect) {
                         streamWriter.appendFollowUpEvent(
                             record.getKey(),
                             WorkflowInstanceIntent.ELEMENT_ACTIVATED,
@@ -271,11 +267,11 @@ public class StreamProcessorTest {
                 new TypedRecordProcessor<UnifiedRecordValue>() {
                   @Override
                   public void processRecord(
-                      long position,
-                      TypedRecord<UnifiedRecordValue> record,
-                      TypedResponseWriter responseWriter,
-                      TypedStreamWriter streamWriter,
-                      Consumer<SideEffectProducer> sideEffect) {
+                      final long position,
+                      final TypedRecord<UnifiedRecordValue> record,
+                      final TypedResponseWriter responseWriter,
+                      final TypedStreamWriter streamWriter,
+                      final Consumer<SideEffectProducer> sideEffect) {
                     sideEffect.accept(
                         () -> {
                           processLatch.countDown();
@@ -303,11 +299,11 @@ public class StreamProcessorTest {
                 new TypedRecordProcessor<UnifiedRecordValue>() {
                   @Override
                   public void processRecord(
-                      long position,
-                      TypedRecord<UnifiedRecordValue> record,
-                      TypedResponseWriter responseWriter,
-                      TypedStreamWriter streamWriter,
-                      Consumer<SideEffectProducer> sideEffect) {
+                      final long position,
+                      final TypedRecord<UnifiedRecordValue> record,
+                      final TypedResponseWriter responseWriter,
+                      final TypedStreamWriter streamWriter,
+                      final Consumer<SideEffectProducer> sideEffect) {
                     sideEffect.accept(
                         () -> {
                           processLatch.countDown();
@@ -335,11 +331,11 @@ public class StreamProcessorTest {
                 new TypedRecordProcessor<UnifiedRecordValue>() {
                   @Override
                   public void processRecord(
-                      long position,
-                      TypedRecord<UnifiedRecordValue> record,
-                      TypedResponseWriter responseWriter,
-                      TypedStreamWriter streamWriter,
-                      Consumer<SideEffectProducer> sideEffect) {
+                      final long position,
+                      final TypedRecord<UnifiedRecordValue> record,
+                      final TypedResponseWriter responseWriter,
+                      final TypedStreamWriter streamWriter,
+                      final Consumer<SideEffectProducer> sideEffect) {
                     sideEffect.accept(
                         () -> {
                           throw new RuntimeException("expected");
@@ -362,21 +358,21 @@ public class StreamProcessorTest {
     final AtomicLong generatedKey = new AtomicLong(-1L);
     final CountDownLatch processLatch = new CountDownLatch(2);
     streamProcessorRule.startTypedStreamProcessor(
-        (processingContext) -> {
+        processingContext -> {
           processingContextActor = processingContext.getActor();
           final ZeebeState state = processingContext.getZeebeState();
-          return processors()
+          return processors(state.getKeyGenerator())
               .onEvent(
                   ValueType.WORKFLOW_INSTANCE,
                   WorkflowInstanceIntent.ELEMENT_ACTIVATING,
                   new TypedRecordProcessor<UnifiedRecordValue>() {
                     @Override
                     public void processRecord(
-                        long position,
-                        TypedRecord<UnifiedRecordValue> record,
-                        TypedResponseWriter responseWriter,
-                        TypedStreamWriter streamWriter,
-                        Consumer<SideEffectProducer> sideEffect) {
+                        final long position,
+                        final TypedRecord<UnifiedRecordValue> record,
+                        final TypedResponseWriter responseWriter,
+                        final TypedStreamWriter streamWriter,
+                        final Consumer<SideEffectProducer> sideEffect) {
                       generatedKey.set(state.getKeyGenerator().nextKey());
                       processLatch.countDown();
                       throw new RuntimeException("expected");
@@ -388,10 +384,10 @@ public class StreamProcessorTest {
                   new TypedRecordProcessor<UnifiedRecordValue>() {
                     @Override
                     public void processRecord(
-                        TypedRecord<UnifiedRecordValue> record,
-                        TypedResponseWriter responseWriter,
-                        TypedStreamWriter streamWriter,
-                        Consumer<SideEffectProducer> sideEffect) {
+                        final TypedRecord<UnifiedRecordValue> record,
+                        final TypedResponseWriter responseWriter,
+                        final TypedStreamWriter streamWriter,
+                        final Consumer<SideEffectProducer> sideEffect) {
                       processLatch.countDown();
                     }
                   });
@@ -421,21 +417,21 @@ public class StreamProcessorTest {
 
     final CountDownLatch processingLatch = new CountDownLatch(1);
     streamProcessorRule.startTypedStreamProcessor(
-        (processingContext) -> {
+        processingContext -> {
           processingContextActor = processingContext.getActor();
           final ZeebeState state = processingContext.getZeebeState();
-          return processors()
+          return processors(state.getKeyGenerator())
               .onEvent(
                   ValueType.WORKFLOW_INSTANCE,
                   WorkflowInstanceIntent.ELEMENT_ACTIVATING,
                   new TypedRecordProcessor<UnifiedRecordValue>() {
                     @Override
                     public void processRecord(
-                        long position,
-                        TypedRecord<UnifiedRecordValue> record,
-                        TypedResponseWriter responseWriter,
-                        TypedStreamWriter streamWriter,
-                        Consumer<SideEffectProducer> sideEffect) {
+                        final long position,
+                        final TypedRecord<UnifiedRecordValue> record,
+                        final TypedResponseWriter responseWriter,
+                        final TypedStreamWriter streamWriter,
+                        final Consumer<SideEffectProducer> sideEffect) {
                       generatedKey.set(state.getKeyGenerator().nextKey());
                     }
                   })
@@ -445,10 +441,10 @@ public class StreamProcessorTest {
                   new TypedRecordProcessor<UnifiedRecordValue>() {
                     @Override
                     public void processRecord(
-                        TypedRecord<UnifiedRecordValue> record,
-                        TypedResponseWriter responseWriter,
-                        TypedStreamWriter streamWriter,
-                        Consumer<SideEffectProducer> sideEffect) {
+                        final TypedRecord<UnifiedRecordValue> record,
+                        final TypedResponseWriter responseWriter,
+                        final TypedStreamWriter streamWriter,
+                        final Consumer<SideEffectProducer> sideEffect) {
                       processingLatch.countDown();
                     }
                   });
@@ -478,17 +474,17 @@ public class StreamProcessorTest {
     final CountDownLatch processingLatch = new CountDownLatch(1);
     final StreamProcessor streamProcessor =
         streamProcessorRule.startTypedStreamProcessor(
-            (processors, state) ->
+            (processors, context) ->
                 processors.onEvent(
                     ValueType.WORKFLOW_INSTANCE,
                     WorkflowInstanceIntent.ELEMENT_ACTIVATING,
                     new TypedRecordProcessor<UnifiedRecordValue>() {
                       @Override
                       public void processRecord(
-                          TypedRecord<UnifiedRecordValue> record,
-                          TypedResponseWriter responseWriter,
-                          TypedStreamWriter streamWriter,
-                          Consumer<SideEffectProducer> sideEffect) {
+                          final TypedRecord<UnifiedRecordValue> record,
+                          final TypedResponseWriter responseWriter,
+                          final TypedStreamWriter streamWriter,
+                          final Consumer<SideEffectProducer> sideEffect) {
                         processingLatch.countDown();
                       }
                     }));
@@ -506,9 +502,8 @@ public class StreamProcessorTest {
     final InOrder inOrder = Mockito.inOrder(stateSnapshotController);
 
     inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).openDb();
-    inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).takeTempSnapshot();
-    inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).moveValidSnapshot(position);
-    inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).ensureMaxSnapshotCount();
+    inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).takeTempSnapshot(anyLong());
+    inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).commitSnapshot(any(Snapshot.class));
   }
 
   @Test
@@ -516,17 +511,17 @@ public class StreamProcessorTest {
     // given
     final CountDownLatch processingLatch = new CountDownLatch(2);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors.onEvent(
                 ValueType.WORKFLOW_INSTANCE,
                 WorkflowInstanceIntent.ELEMENT_ACTIVATING,
                 new TypedRecordProcessor<UnifiedRecordValue>() {
                   @Override
                   public void processRecord(
-                      TypedRecord<UnifiedRecordValue> record,
-                      TypedResponseWriter responseWriter,
-                      TypedStreamWriter streamWriter,
-                      Consumer<SideEffectProducer> sideEffect) {
+                      final TypedRecord<UnifiedRecordValue> record,
+                      final TypedResponseWriter responseWriter,
+                      final TypedStreamWriter streamWriter,
+                      final Consumer<SideEffectProducer> sideEffect) {
                     processingLatch.countDown();
                   }
                 }));
@@ -535,15 +530,14 @@ public class StreamProcessorTest {
     streamProcessorRule.writeWorkflowInstanceEvent(WorkflowInstanceIntent.ELEMENT_ACTIVATING);
     streamProcessorRule.writeWorkflowInstanceEvent(WorkflowInstanceIntent.ELEMENT_ACTIVATING);
     processingLatch.await();
+    final StateSnapshotController stateSnapshotController =
+        streamProcessorRule.getStateSnapshotController();
     streamProcessorRule.closeStreamProcessor();
 
     // then
-    final StateSnapshotController stateSnapshotController =
-        streamProcessorRule.getStateSnapshotController();
     final InOrder inOrder = Mockito.inOrder(stateSnapshotController);
 
     inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).openDb();
-    inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).getLastValidSnapshotPosition();
 
     inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).takeSnapshot(anyLong());
   }
@@ -553,24 +547,24 @@ public class StreamProcessorTest {
     // given
     final CountDownLatch recoveredLatch = new CountDownLatch(1);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors.onEvent(
                 ValueType.WORKFLOW_INSTANCE,
                 WorkflowInstanceIntent.ELEMENT_ACTIVATING,
                 new TypedRecordProcessor<UnifiedRecordValue>() {
                   @Override
-                  public void onRecovered(ReadonlyProcessingContext context) {
+                  public void onRecovered(final ReadonlyProcessingContext context) {
                     recoveredLatch.countDown();
                   }
                 }));
 
     // when
     recoveredLatch.await();
+    final StateSnapshotController stateSnapshotController =
+        streamProcessorRule.getStateSnapshotController();
     streamProcessorRule.closeStreamProcessor();
 
     // then
-    final StateSnapshotController stateSnapshotController =
-        streamProcessorRule.getStateSnapshotController();
     final InOrder inOrder = Mockito.inOrder(stateSnapshotController);
 
     inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).openDb();
@@ -578,9 +572,9 @@ public class StreamProcessorTest {
   }
 
   @Test
-  public void shouldNotCreateSnapshotsIfNoProcessorProcessEvent() throws Exception {
+  public void shouldNotCreateSnapshotsIfNoProcessorProcessEvent() {
     // given
-    streamProcessorRule.startTypedStreamProcessor((processors, state) -> processors);
+    streamProcessorRule.startTypedStreamProcessor((processors, context) -> processors);
 
     // when
     final long position =
@@ -593,19 +587,17 @@ public class StreamProcessorTest {
     final InOrder inOrder = Mockito.inOrder(stateSnapshotController);
 
     inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).openDb();
-    inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).getLastValidSnapshotPosition();
 
-    inOrder.verify(stateSnapshotController, never()).takeTempSnapshot();
-    inOrder.verify(stateSnapshotController, never()).moveValidSnapshot(position);
-    inOrder.verify(stateSnapshotController, never()).ensureMaxSnapshotCount();
+    inOrder.verify(stateSnapshotController, never()).takeTempSnapshot(anyLong());
+    inOrder.verify(stateSnapshotController, never()).commitSnapshot(any(Snapshot.class));
   }
 
   @Test
-  public void shouldNotCreateSnapshotsIfNewEventExist() throws Exception {
+  public void shouldNotCreateSnapshotsIfNewEventExist() {
     // given
     final TypedRecordProcessor typedRecordProcessor = mock(TypedRecordProcessor.class);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors.onEvent(
                 ValueType.WORKFLOW_INSTANCE,
                 WorkflowInstanceIntent.ELEMENT_ACTIVATING,
@@ -620,11 +612,9 @@ public class StreamProcessorTest {
     final InOrder inOrder = Mockito.inOrder(stateSnapshotController);
 
     inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).openDb();
-    inOrder.verify(stateSnapshotController, TIMEOUT.times(1)).getLastValidSnapshotPosition();
 
-    inOrder.verify(stateSnapshotController, never()).takeTempSnapshot();
-    inOrder.verify(stateSnapshotController, never()).moveValidSnapshot(anyLong());
-    inOrder.verify(stateSnapshotController, never()).ensureMaxSnapshotCount();
+    inOrder.verify(stateSnapshotController, never()).takeTempSnapshot(anyLong());
+    inOrder.verify(stateSnapshotController, never()).commitSnapshot(any());
   }
 
   @Test
@@ -632,18 +622,18 @@ public class StreamProcessorTest {
     // given
     final CountDownLatch processLatch = new CountDownLatch(1);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors.onEvent(
                 ValueType.WORKFLOW_INSTANCE,
                 WorkflowInstanceIntent.ELEMENT_ACTIVATING,
                 new TypedRecordProcessor<UnifiedRecordValue>() {
                   @Override
                   public void processRecord(
-                      long position,
-                      TypedRecord<UnifiedRecordValue> record,
-                      TypedResponseWriter responseWriter,
-                      TypedStreamWriter streamWriter,
-                      Consumer<SideEffectProducer> sideEffect) {
+                      final long position,
+                      final TypedRecord<UnifiedRecordValue> record,
+                      final TypedResponseWriter responseWriter,
+                      final TypedStreamWriter streamWriter,
+                      final Consumer<SideEffectProducer> sideEffect) {
                     responseWriter.writeEventOnCommand(
                         3, WorkflowInstanceIntent.ELEMENT_COMPLETING, record.getValue(), record);
                     processLatch.countDown();
@@ -674,18 +664,18 @@ public class StreamProcessorTest {
     // given
     final CountDownLatch processLatch = new CountDownLatch(1);
     streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
+        (processors, context) ->
             processors.onEvent(
                 ValueType.WORKFLOW_INSTANCE,
                 WorkflowInstanceIntent.ELEMENT_ACTIVATING,
                 new TypedRecordProcessor<UnifiedRecordValue>() {
                   @Override
                   public void processRecord(
-                      long position,
-                      TypedRecord<UnifiedRecordValue> record,
-                      TypedResponseWriter responseWriter,
-                      TypedStreamWriter streamWriter,
-                      Consumer<SideEffectProducer> sideEffect) {
+                      final long position,
+                      final TypedRecord<UnifiedRecordValue> record,
+                      final TypedResponseWriter responseWriter,
+                      final TypedStreamWriter streamWriter,
+                      final Consumer<SideEffectProducer> sideEffect) {
                     responseWriter.writeEventOnCommand(
                         3, WorkflowInstanceIntent.ELEMENT_COMPLETING, record.getValue(), record);
                     processLatch.countDown();
@@ -713,54 +703,31 @@ public class StreamProcessorTest {
   }
 
   @Test
-  public void shouldNotProcessNextEventBeforeErrorEventIsCommitted() throws Exception {
+  public void shouldInvokeOnProcessedListener() throws InterruptedException {
     // given
     final CountDownLatch processLatch = new CountDownLatch(1);
-    final AtomicLong lastCommitPosition = new AtomicLong(0);
-    streamProcessorRule.writeWorkflowInstanceEvent(WorkflowInstanceIntent.ELEMENT_ACTIVATING);
-    streamProcessorRule.writeWorkflowInstanceEvent(WorkflowInstanceIntent.ELEMENT_ACTIVATED, 2);
-    streamProcessorRule.writeWorkflowInstanceEvent(WorkflowInstanceIntent.ELEMENT_COMPLETING, 2);
+    streamProcessorRule.startTypedStreamProcessor(
+        (processors, context) ->
+            processors.onEvent(
+                ValueType.WORKFLOW_INSTANCE,
+                WorkflowInstanceIntent.ELEMENT_ACTIVATING,
+                new TypedRecordProcessor<UnifiedRecordValue>() {
+                  @Override
+                  public void processRecord(
+                      final long position,
+                      final TypedRecord<UnifiedRecordValue> record,
+                      final TypedResponseWriter responseWriter,
+                      final TypedStreamWriter streamWriter,
+                      final Consumer<SideEffectProducer> sideEffect) {
+                    processLatch.countDown();
+                  }
+                }));
 
     // when
-    streamProcessorRule.startTypedStreamProcessor(
-        (processors, state) ->
-            processors
-                .onEvent(
-                    ValueType.WORKFLOW_INSTANCE,
-                    WorkflowInstanceIntent.ELEMENT_ACTIVATING,
-                    new TypedRecordProcessor<UnifiedRecordValue>() {
-                      @Override
-                      public void processRecord(
-                          long position,
-                          TypedRecord<UnifiedRecordValue> record,
-                          TypedResponseWriter responseWriter,
-                          TypedStreamWriter streamWriter,
-                          Consumer<SideEffectProducer> sideEffect) {
-                        throw new RuntimeException("expected");
-                      }
-                    })
-                .onEvent(
-                    ValueType.WORKFLOW_INSTANCE,
-                    WorkflowInstanceIntent.ELEMENT_ACTIVATED,
-                    new TypedRecordProcessor<UnifiedRecordValue>() {
-                      @Override
-                      public void processRecord(
-                          long position,
-                          TypedRecord<UnifiedRecordValue> record,
-                          TypedResponseWriter responseWriter,
-                          TypedStreamWriter streamWriter,
-                          Consumer<SideEffectProducer> sideEffect) {
-                        lastCommitPosition.set(streamProcessorRule.getCommitPosition());
-                        processLatch.countDown();
-                      }
-                    }));
-
-    // then
+    streamProcessorRule.writeWorkflowInstanceEvent(WorkflowInstanceIntent.ELEMENT_ACTIVATING);
     processLatch.await();
 
-    final Record<ErrorRecord> errorRecord =
-        streamProcessorRule.events().onlyErrorRecords().getFirst();
-
-    assertThat(lastCommitPosition.get()).isEqualTo(errorRecord.getPosition());
+    // then
+    verify(streamProcessorRule.getProcessedListener(), timeout(1000).times(1)).accept(any());
   }
 }

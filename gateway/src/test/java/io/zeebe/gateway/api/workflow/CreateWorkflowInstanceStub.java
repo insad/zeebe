@@ -7,13 +7,13 @@
  */
 package io.zeebe.gateway.api.workflow;
 
-import io.zeebe.gateway.api.util.StubbedGateway;
-import io.zeebe.gateway.api.util.StubbedGateway.RequestStub;
+import io.zeebe.gateway.api.util.StubbedBrokerClient;
+import io.zeebe.gateway.api.util.StubbedBrokerClient.RequestStub;
 import io.zeebe.gateway.impl.broker.request.BrokerCreateWorkflowInstanceRequest;
 import io.zeebe.gateway.impl.broker.response.BrokerResponse;
 import io.zeebe.protocol.impl.record.value.workflowinstance.WorkflowInstanceCreationRecord;
 
-public class CreateWorkflowInstanceStub
+public final class CreateWorkflowInstanceStub
     implements RequestStub<
         BrokerCreateWorkflowInstanceRequest, BrokerResponse<WorkflowInstanceCreationRecord>> {
 
@@ -23,7 +23,7 @@ public class CreateWorkflowInstanceStub
   public static final long WORKFLOW_KEY = 456;
 
   @Override
-  public void registerWith(StubbedGateway gateway) {
+  public void registerWith(final StubbedBrokerClient gateway) {
     gateway.registerHandler(BrokerCreateWorkflowInstanceRequest.class, this);
   }
 
@@ -45,7 +45,7 @@ public class CreateWorkflowInstanceStub
 
   @Override
   public BrokerResponse<WorkflowInstanceCreationRecord> handle(
-      BrokerCreateWorkflowInstanceRequest request) throws Exception {
+      final BrokerCreateWorkflowInstanceRequest request) throws Exception {
     final WorkflowInstanceCreationRecord response = new WorkflowInstanceCreationRecord();
     response.setBpmnProcessId(PROCESS_ID);
     response.setVariables(request.getRequestWriter().getVariablesBuffer());

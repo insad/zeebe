@@ -8,57 +8,43 @@
 package io.zeebe.logstreams.state;
 
 import io.zeebe.logstreams.impl.Loggers;
-import io.zeebe.logstreams.spi.ValidSnapshotListener;
 import java.io.File;
 import java.io.IOException;
-import org.agrona.collections.Long2LongHashMap;
+import java.util.Map;
+import org.agrona.collections.Object2NullableObjectHashMap;
 import org.slf4j.Logger;
 
-public final class ReplicationController {
-
+final class ReplicationController {
   private static final Logger LOG = Loggers.SNAPSHOT_LOGGER;
-
-  private static final long START_VALUE = 0L;
-  private static final long INVALID_SNAPSHOT = -1;
-  private static final long MISSING_SNAPSHOT = Long.MIN_VALUE;
-  private static final ValidSnapshotListener NOOP_VALID_SNAPSHOT_LISTENER = () -> {};
+  private static final ReplicationContext INVALID_SNAPSHOT = new ReplicationContext(-1, -1);
 
   private final SnapshotReplication replication;
-  private final Long2LongHashMap receivedSnapshots = new Long2LongHashMap(MISSING_SNAPSHOT);
-  private final StateStorage storage;
+  private final Map<String, ReplicationContext> receivedSnapshots =
+      new Object2NullableObjectHashMap<>();
+  private final SnapshotReplicationMetrics metrics;
 
   private final SnapshotConsumer snapshotConsumer;
 
-  private final ValidSnapshotListener validSnapshotListener;
-
-  public ReplicationController(SnapshotReplication replication, StateStorage storage) {
-    this(replication, storage, NOOP_VALID_SNAPSHOT_LISTENER);
-  }
-
-  public ReplicationController(
-      SnapshotReplication replication,
-      StateStorage storage,
-      ValidSnapshotListener validSnapshotListener) {
+  ReplicationController(final SnapshotReplication replication, final SnapshotStorage storage) {
     this.replication = replication;
-    this.storage = storage;
-    this.validSnapshotListener = validSnapshotListener;
     this.snapshotConsumer = new FileSnapshotConsumer(storage, LOG);
+    this.metrics = storage.getMetrics().getReplication();
+    this.metrics.setCount(0);
   }
 
-  public void replicate(long snapshotPosition, int totalCount, File snapshotChunkFile) {
+  void replicate(final String snapshotId, final int totalCount, final File snapshotChunkFile) {
     try {
       final SnapshotChunk chunkToReplicate =
-          SnapshotChunkUtil.createSnapshotChunkFromFile(
-              snapshotChunkFile, snapshotPosition, totalCount);
+          SnapshotChunkUtil.createSnapshotChunkFromFile(snapshotChunkFile, snapshotId, totalCount);
       replication.replicate(chunkToReplicate);
-    } catch (IOException ioe) {
+    } catch (final IOException ioe) {
       LOG.error(
           "Unexpected error on reading snapshot chunk from file '{}'.", snapshotChunkFile, ioe);
     }
   }
 
   /** Registering for consuming snapshot chunks. */
-  public void consumeReplicatedSnapshots() {
+  void consumeReplicatedSnapshots() {
     replication.consume(this::consumeSnapshotChunk);
   }
 
@@ -67,75 +53,82 @@ public final class ReplicationController {
    *
    * @param snapshotChunk the chunk to consume
    */
-  private void consumeSnapshotChunk(SnapshotChunk snapshotChunk) {
-    final long snapshotPosition = snapshotChunk.getSnapshotPosition();
-    final String snapshotName = Long.toString(snapshotPosition);
+  private void consumeSnapshotChunk(final SnapshotChunk snapshotChunk) {
+    final String snapshotId = snapshotChunk.getSnapshotId();
     final String chunkName = snapshotChunk.getChunkName();
 
-    final long snapshotCounter =
-        receivedSnapshots.computeIfAbsent(snapshotPosition, k -> START_VALUE);
-    if (snapshotCounter == INVALID_SNAPSHOT) {
-      LOG.debug(
+    final ReplicationContext context =
+        receivedSnapshots.computeIfAbsent(snapshotId, this::newReplication);
+    if (context == INVALID_SNAPSHOT) {
+      LOG.trace(
           "Ignore snapshot chunk {}, because snapshot {} is marked as invalid.",
           chunkName,
-          snapshotName);
+          snapshotId);
       return;
     }
 
     if (snapshotConsumer.consumeSnapshotChunk(snapshotChunk)) {
-      validateWhenReceivedAllChunks(snapshotChunk);
+      validateWhenReceivedAllChunks(snapshotChunk, context);
     } else {
       markSnapshotAsInvalid(snapshotChunk);
     }
   }
 
-  private void markSnapshotAsInvalid(SnapshotChunk chunk) {
-    final long snapshotPosition = chunk.getSnapshotPosition();
-    receivedSnapshots.put(snapshotPosition, INVALID_SNAPSHOT);
+  private void markSnapshotAsInvalid(final SnapshotChunk chunk) {
+    snapshotConsumer.invalidateSnapshot(chunk.getSnapshotId());
+    receivedSnapshots.put(chunk.getSnapshotId(), INVALID_SNAPSHOT);
+    metrics.decrementCount();
   }
 
-  private void validateWhenReceivedAllChunks(SnapshotChunk snapshotChunk) {
+  private void validateWhenReceivedAllChunks(
+      final SnapshotChunk snapshotChunk, final ReplicationContext context) {
     final int totalChunkCount = snapshotChunk.getTotalCount();
-    final long currentChunks = incrementAndGetChunkCount(snapshotChunk);
+    context.chunkCount++;
 
-    if (currentChunks == totalChunkCount) {
-      final File validSnapshotDirectory =
-          storage.getSnapshotDirectoryFor(snapshotChunk.getSnapshotPosition());
+    if (context.chunkCount == totalChunkCount) {
       LOG.debug(
-          "Received all snapshot chunks ({}/{}), snapshot is valid. Move to {}",
-          currentChunks,
-          totalChunkCount,
-          validSnapshotDirectory.toPath());
-
-      final boolean valid = tryToMarkSnapshotAsValid(snapshotChunk);
-
-      if (valid) {
-        validSnapshotListener.onNewValidSnapshot();
+          "Received all snapshot chunks ({}/{}), snapshot is valid",
+          context.chunkCount,
+          totalChunkCount);
+      if (!tryToMarkSnapshotAsValid(snapshotChunk, context)) {
+        LOG.debug("Failed to mark snapshot {} as valid", snapshotChunk.getSnapshotId());
       }
     } else {
       LOG.debug(
-          "Waiting for more snapshot chunks, currently have {}/{}.",
-          currentChunks,
+          "Waiting for more snapshot chunks, currently have {}/{}",
+          context.chunkCount,
           totalChunkCount);
     }
   }
 
-  private long incrementAndGetChunkCount(SnapshotChunk snapshotChunk) {
-    final long snapshotPosition = snapshotChunk.getSnapshotPosition();
-    final long oldCount = receivedSnapshots.get(snapshotPosition);
-    final long newCount = oldCount + 1;
-    receivedSnapshots.put(snapshotPosition, newCount);
-    return newCount;
-  }
+  private boolean tryToMarkSnapshotAsValid(
+      final SnapshotChunk snapshotChunk, final ReplicationContext context) {
+    if (snapshotConsumer.completeSnapshot(snapshotChunk.getSnapshotId())) {
+      final var elapsed = System.currentTimeMillis() - context.startTimestamp;
+      receivedSnapshots.remove(snapshotChunk.getSnapshotId());
+      metrics.decrementCount();
+      metrics.observeDuration(elapsed);
 
-  private boolean tryToMarkSnapshotAsValid(SnapshotChunk snapshotChunk) {
-    if (snapshotConsumer.completeSnapshot(snapshotChunk.getSnapshotPosition())) {
-      receivedSnapshots.remove(snapshotChunk.getSnapshotPosition());
       return true;
-
     } else {
       markSnapshotAsInvalid(snapshotChunk);
       return false;
+    }
+  }
+
+  private ReplicationContext newReplication(final String ignored) {
+    final var context = new ReplicationContext(0L, System.currentTimeMillis());
+    metrics.incrementCount();
+    return context;
+  }
+
+  private static final class ReplicationContext {
+    private final long startTimestamp;
+    private long chunkCount;
+
+    private ReplicationContext(final long chunkCount, final long startTimestamp) {
+      this.chunkCount = chunkCount;
+      this.startTimestamp = startTimestamp;
     }
   }
 }

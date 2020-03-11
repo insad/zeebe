@@ -20,16 +20,17 @@ import io.zeebe.client.api.ZeebeFuture;
 import io.zeebe.client.api.command.FinalCommandStep;
 import io.zeebe.client.api.command.UpdateRetriesJobCommandStep1;
 import io.zeebe.client.api.command.UpdateRetriesJobCommandStep1.UpdateRetriesJobCommandStep2;
+import io.zeebe.client.api.response.UpdateRetriesJobResponse;
 import io.zeebe.client.impl.RetriableClientFutureImpl;
 import io.zeebe.gateway.protocol.GatewayGrpc.GatewayStub;
+import io.zeebe.gateway.protocol.GatewayOuterClass;
 import io.zeebe.gateway.protocol.GatewayOuterClass.UpdateJobRetriesRequest;
 import io.zeebe.gateway.protocol.GatewayOuterClass.UpdateJobRetriesRequest.Builder;
-import io.zeebe.gateway.protocol.GatewayOuterClass.UpdateJobRetriesResponse;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
-public class JobUpdateRetriesCommandImpl
+public final class JobUpdateRetriesCommandImpl
     implements UpdateRetriesJobCommandStep1, UpdateRetriesJobCommandStep2 {
 
   private final GatewayStub asyncStub;
@@ -38,10 +39,10 @@ public class JobUpdateRetriesCommandImpl
   private Duration requestTimeout;
 
   public JobUpdateRetriesCommandImpl(
-      GatewayStub asyncStub,
-      long jobKey,
-      Duration requestTimeout,
-      Predicate<Throwable> retryPredicate) {
+      final GatewayStub asyncStub,
+      final long jobKey,
+      final Duration requestTimeout,
+      final Predicate<Throwable> retryPredicate) {
     this.asyncStub = asyncStub;
     this.requestTimeout = requestTimeout;
     this.retryPredicate = retryPredicate;
@@ -50,31 +51,34 @@ public class JobUpdateRetriesCommandImpl
   }
 
   @Override
-  public UpdateRetriesJobCommandStep2 retries(int retries) {
+  public UpdateRetriesJobCommandStep2 retries(final int retries) {
     builder.setRetries(retries);
     return this;
   }
 
   @Override
-  public FinalCommandStep<Void> requestTimeout(Duration requestTimeout) {
+  public FinalCommandStep<UpdateRetriesJobResponse> requestTimeout(final Duration requestTimeout) {
     this.requestTimeout = requestTimeout;
     return this;
   }
 
   @Override
-  public ZeebeFuture<Void> send() {
+  public ZeebeFuture<UpdateRetriesJobResponse> send() {
     final UpdateJobRetriesRequest request = builder.build();
 
-    final RetriableClientFutureImpl<Void, UpdateJobRetriesResponse> future =
-        new RetriableClientFutureImpl<>(
-            retryPredicate, streamObserver -> send(request, streamObserver));
+    final RetriableClientFutureImpl<
+            UpdateRetriesJobResponse, GatewayOuterClass.UpdateJobRetriesResponse>
+        future =
+            new RetriableClientFutureImpl<>(
+                retryPredicate, streamObserver -> send(request, streamObserver));
 
     send(request, future);
     return future;
   }
 
   private void send(
-      UpdateJobRetriesRequest request, StreamObserver<UpdateJobRetriesResponse> streamObserver) {
+      final UpdateJobRetriesRequest request,
+      final StreamObserver<GatewayOuterClass.UpdateJobRetriesResponse> streamObserver) {
     asyncStub
         .withDeadlineAfter(requestTimeout.toMillis(), TimeUnit.MILLISECONDS)
         .updateJobRetries(request, streamObserver);

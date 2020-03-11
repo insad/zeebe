@@ -26,6 +26,7 @@ import io.zeebe.model.bpmn.instance.SignalEventDefinition;
 import io.zeebe.model.bpmn.instance.StartEvent;
 import io.zeebe.model.bpmn.instance.SubProcess;
 import java.util.Arrays;
+import java.util.Collections;
 import org.junit.runners.Parameterized.Parameters;
 
 public class ZeebeStartEventValidationTest extends AbstractZeebeValidationTest {
@@ -39,10 +40,7 @@ public class ZeebeStartEventValidationTest extends AbstractZeebeValidationTest {
       },
       {
         Bpmn.createExecutableProcess().startEvent().signal("signal").endEvent().done(),
-        Arrays.asList(
-            expect(
-                StartEvent.class,
-                "Start event must be one of the following types: none, timer, message"),
+        singletonList(
             expect(SignalEventDefinition.class, "Event definition of this type is not supported")),
       },
       {
@@ -60,23 +58,47 @@ public class ZeebeStartEventValidationTest extends AbstractZeebeValidationTest {
         "multiple-timer-start-event-sub-process.bpmn",
         Arrays.asList(
             expect(SubProcess.class, "Start events in subprocesses must be of type none"),
-            expect(SubProcess.class, "Start events in subprocesses must be of type none"),
             expect(SubProcess.class, "Must have exactly one start event"))
       },
       {
-        getProcessWithMultipleNoneStartEvents(),
-        singletonList(
-            expect(
-                Process.class,
-                "Must be either one none start event or multiple message/timer start events"))
+        processWithMultipleNoneStartEvents(),
+        singletonList(expect(Process.class, "Multiple none start events are not allowed"))
       },
+      {
+        cycleTimerStartEventSubprocess(false), valid(),
+      },
+      {
+        cycleTimerStartEventSubprocess(true),
+        Collections.singletonList(
+            expect(SubProcess.class, "Interrupting timer event with time cycle is not allowed.")),
+      },
+      {processWithNoneStartEventAndMultipleOtherStartEvents(), valid()},
     };
   }
 
-  private static BpmnModelInstance getProcessWithMultipleNoneStartEvents() {
+  private static BpmnModelInstance processWithMultipleNoneStartEvents() {
     final ProcessBuilder process = Bpmn.createExecutableProcess();
     process.startEvent().endEvent();
+    return process.startEvent().endEvent().done();
+  }
+
+  private static BpmnModelInstance cycleTimerStartEventSubprocess(final boolean interrupting) {
+    final ProcessBuilder processBuilder = Bpmn.createExecutableProcess();
+    processBuilder.startEvent().serviceTask("task", b -> b.zeebeTaskType("type")).endEvent();
+    return processBuilder
+        .eventSubProcess()
+        .startEvent()
+        .interrupting(interrupting)
+        .timerWithCycle("R/PT60S")
+        .endEvent()
+        .done();
+  }
+
+  private static BpmnModelInstance processWithNoneStartEventAndMultipleOtherStartEvents() {
+    final ProcessBuilder process = Bpmn.createExecutableProcess();
     process.startEvent().endEvent();
+    process.startEvent().timerWithCycle("R/PT1H");
+    process.startEvent().message("start");
     return process.done();
   }
 }

@@ -10,8 +10,8 @@ package io.zeebe.test.exporter;
 import static io.zeebe.test.EmbeddedBrokerRule.TEST_RECORD_EXPORTER_ID;
 import static io.zeebe.test.util.record.RecordingExporter.workflowInstanceRecords;
 
-import com.moandjiezana.toml.Toml;
-import com.moandjiezana.toml.TomlWriter;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.zeebe.broker.system.configuration.BrokerCfg;
 import io.zeebe.broker.system.configuration.ExporterCfg;
 import io.zeebe.client.ClientProperties;
@@ -26,12 +26,17 @@ import io.zeebe.protocol.record.intent.WorkflowInstanceIntent;
 import io.zeebe.protocol.record.value.IncidentRecordValue;
 import io.zeebe.test.ClientRule;
 import io.zeebe.test.EmbeddedBrokerRule;
+import io.zeebe.test.util.TestConfigurationFactory;
 import io.zeebe.test.util.TestUtil;
 import io.zeebe.test.util.record.RecordingExporter;
+import io.zeebe.util.SocketUtil;
 import java.io.InputStream;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -53,7 +58,7 @@ import org.junit.rules.ExternalResource;
  * explicitly configured, it must be started explicitly using {@link
  * ExporterIntegrationRule#start()}.
  *
- * <p>The broker is configured either implicitly through "zeebe.test.cfg.toml" (found in the
+ * <p>The broker is configured either implicitly through "zeebe.test.cfg.yaml" (found in the
  * resource classpath) or explicitly through one of the configure methods.
  *
  * <p>An example integration test suite could look like:
@@ -122,6 +127,8 @@ public class ExporterIntegrationRule extends ExternalResource {
           .endEvent()
           .done();
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   private final EmbeddedBrokerRule brokerRule = new EmbeddedBrokerRule();
   private ClientRule clientRule;
 
@@ -151,8 +158,9 @@ public class ExporterIntegrationRule extends ExternalResource {
 
   /** @return the currently configured exporters */
   public List<ExporterCfg> getConfiguredExporters() {
-    return getBrokerConfig().getExporters().stream()
-        .filter(cfg -> !cfg.getId().equals(TEST_RECORD_EXPORTER_ID))
+    return getBrokerConfig().getExporters().entrySet().stream()
+        .filter(entry -> !entry.getKey().equals(TEST_RECORD_EXPORTER_ID))
+        .map(Entry::getValue)
         .collect(Collectors.toList());
   }
 
@@ -169,23 +177,21 @@ public class ExporterIntegrationRule extends ExternalResource {
    * @param <T> type of the configuration instance
    * @return instantiated configuration class based on the exporter args map
    */
-  public <T> T getExporterConfiguration(String id, Class<T> configurationClass) {
-    return getConfiguredExporters().stream()
-        .filter(cfg -> cfg.getId().equals(id))
-        .findFirst()
+  public <T> T getExporterConfiguration(final String id, final Class<T> configurationClass) {
+    return Optional.ofNullable(getBrokerConfig().getExporters().get(id))
         .map(cfg -> convertMapToConfig(cfg.getArgs(), configurationClass))
         .orElseThrow(
             () -> new IllegalArgumentException("No exporter with ID " + id + " configured"));
   }
 
   /**
-   * Configures the broker to add whatever exporters are defined in the TOML represented by the
+   * Configures the broker to add whatever exporters are defined in the yaml represented by the
    * input stream.
    *
-   * @param toml input stream wrapping a TOML document
+   * @param yaml input stream wrapping a yaml document
    */
-  public ExporterIntegrationRule configure(InputStream toml) {
-    final BrokerCfg config = new Toml().read(toml).to(BrokerCfg.class);
+  public ExporterIntegrationRule configure(final InputStream yaml) {
+    final BrokerCfg config = new TestConfigurationFactory().create(yaml, BrokerCfg.class);
     return configure(config.getExporters());
   }
 
@@ -199,7 +205,7 @@ public class ExporterIntegrationRule extends ExternalResource {
    * @param <E> type of the exporter
    */
   public <T, E extends Exporter> ExporterIntegrationRule configure(
-      String id, Class<E> exporterClass, T configuration) {
+      final String id, final Class<E> exporterClass, final T configuration) {
     final Map<String, Object> arguments = convertConfigToMap(configuration);
     return configure(id, exporterClass, arguments);
   }
@@ -213,13 +219,12 @@ public class ExporterIntegrationRule extends ExternalResource {
    * @param <E> type of the exporter
    */
   public <E extends Exporter> ExporterIntegrationRule configure(
-      String id, Class<E> exporterClass, Map<String, Object> arguments) {
+      final String id, final Class<E> exporterClass, final Map<String, Object> arguments) {
     final ExporterCfg config = new ExporterCfg();
-    config.setId(id);
     config.setClassName(exporterClass.getCanonicalName());
     config.setArgs(arguments);
 
-    return configure(Collections.singletonList(config));
+    return configure(Collections.singletonMap(id, config));
   }
 
   /**
@@ -250,8 +255,12 @@ public class ExporterIntegrationRule extends ExternalResource {
   /** Runs a sample workload on the broker, exporting several records of different types. */
   public void performSampleWorkload() {
     deployWorkflow(SAMPLE_WORKFLOW, "sample_workflow.bpmn");
-    final long workflowInstanceKey =
-        createWorkflowInstance("testProcess", Collections.singletonMap("orderId", "foo-bar-123"));
+
+    final Map<String, Object> variables = new HashMap<>();
+    variables.put("orderId", "foo-bar-123");
+    variables.put("largeValue", "x".repeat(8192));
+
+    final long workflowInstanceKey = createWorkflowInstance("testProcess", variables);
 
     // create job worker which fails on first try and sets retries to 0 to create an incident
     final AtomicBoolean fail = new AtomicBoolean(true);
@@ -293,7 +302,7 @@ public class ExporterIntegrationRule extends ExternalResource {
    *
    * @param visitor record consumer
    */
-  public void visitExportedRecords(Consumer<Record<?>> visitor) {
+  public void visitExportedRecords(final Consumer<Record<?>> visitor) {
     RecordingExporter.getRecords().forEach(visitor);
   }
 
@@ -304,7 +313,7 @@ public class ExporterIntegrationRule extends ExternalResource {
    * @param workflow workflow to deploy
    * @param filename resource name, e.g. "workflow.bpmn"
    */
-  public void deployWorkflow(BpmnModelInstance workflow, String filename) {
+  public void deployWorkflow(final BpmnModelInstance workflow, final String filename) {
     clientRule.getClient().newDeployCommand().addWorkflowModel(workflow, filename).send().join();
   }
 
@@ -315,7 +324,7 @@ public class ExporterIntegrationRule extends ExternalResource {
    * @param variables initial variables for the instance
    * @return unique ID used to interact with the instance
    */
-  public long createWorkflowInstance(String processId, Map<String, Object> variables) {
+  public long createWorkflowInstance(final String processId, final Map<String, Object> variables) {
     return clientRule
         .getClient()
         .newCreateInstanceCommand()
@@ -336,7 +345,7 @@ public class ExporterIntegrationRule extends ExternalResource {
    * @param handler handler
    * @return a new JobWorker
    */
-  public JobWorker createJobWorker(String type, JobHandler handler) {
+  public JobWorker createJobWorker(final String type, final JobHandler handler) {
     return clientRule.getClient().newWorker().jobType(type).handler(handler).open();
   }
 
@@ -346,7 +355,7 @@ public class ExporterIntegrationRule extends ExternalResource {
    * @param messageName name of the message
    * @param correlationKey correlation key
    */
-  public void publishMessage(String messageName, String correlationKey) {
+  public void publishMessage(final String messageName, final String correlationKey) {
     clientRule
         .getClient()
         .newPublishMessageCommand()
@@ -361,7 +370,7 @@ public class ExporterIntegrationRule extends ExternalResource {
    *
    * @param workflowInstanceKey ID of the workflow
    */
-  public void awaitWorkflowCompletion(long workflowInstanceKey) {
+  public void awaitWorkflowCompletion(final long workflowInstanceKey) {
     TestUtil.waitUntil(
         () ->
             workflowInstanceRecords(WorkflowInstanceIntent.ELEMENT_COMPLETED)
@@ -373,23 +382,24 @@ public class ExporterIntegrationRule extends ExternalResource {
     final Properties properties = new Properties();
     properties.put(
         ClientProperties.BROKER_CONTACTPOINT,
-        getBrokerConfig().getGateway().getNetwork().toSocketAddress().toString());
+        SocketUtil.toHostAndPortString(
+            getBrokerConfig().getGateway().getNetwork().toSocketAddress()));
     properties.put(ClientProperties.USE_PLAINTEXT_CONNECTION, "");
 
     return properties;
   }
 
-  private ExporterIntegrationRule configure(List<ExporterCfg> exporters) {
-    getBrokerConfig().getExporters().addAll(exporters);
+  private ExporterIntegrationRule configure(final Map<String, ExporterCfg> exporters) {
+    getBrokerConfig().getExporters().putAll(exporters);
 
     return this;
   }
 
-  private <T> Map<String, Object> convertConfigToMap(T configuration) {
-    return new Toml().read(new TomlWriter().write(configuration)).toMap();
+  private <T> Map<String, Object> convertConfigToMap(final T configuration) {
+    return OBJECT_MAPPER.convertValue(configuration, new TypeReference<Map<String, Object>>() {});
   }
 
-  private <T> T convertMapToConfig(Map<String, Object> map, Class<T> configClass) {
-    return new Toml().read(new TomlWriter().write(map)).to(configClass);
+  private <T> T convertMapToConfig(final Map<String, Object> map, final Class<T> configClass) {
+    return OBJECT_MAPPER.convertValue(map, configClass);
   }
 }

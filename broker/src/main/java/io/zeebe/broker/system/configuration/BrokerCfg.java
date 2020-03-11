@@ -10,18 +10,27 @@ package io.zeebe.broker.system.configuration;
 import com.google.gson.GsonBuilder;
 import io.zeebe.broker.exporter.debug.DebugLogExporter;
 import io.zeebe.util.Environment;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
 
-public class BrokerCfg {
+@Component
+@ConfigurationProperties(prefix = "zeebe.broker")
+public final class BrokerCfg {
+
+  protected static final String ENV_DEBUG_EXPORTER = "ZEEBE_DEBUG";
 
   private NetworkCfg network = new NetworkCfg();
   private ClusterCfg cluster = new ClusterCfg();
   private ThreadsCfg threads = new ThreadsCfg();
   private DataCfg data = new DataCfg();
-  private List<ExporterCfg> exporters = new ArrayList<>();
+  private Map<String, ExporterCfg> exporters = new HashMap<>();
   private EmbeddedGatewayCfg gateway = new EmbeddedGatewayCfg();
   private BackpressureCfg backpressure = new BackpressureCfg();
+
+  private Duration stepTimeout = Duration.ofMinutes(5);
 
   public void init(final String brokerBase) {
     init(brokerBase, new Environment());
@@ -29,21 +38,23 @@ public class BrokerCfg {
 
   public void init(final String brokerBase, final Environment environment) {
     applyEnvironment(environment);
-    network.init(this, brokerBase, environment);
-    cluster.init(this, brokerBase, environment);
-    threads.init(this, brokerBase, environment);
-    data.init(this, brokerBase, environment);
-    exporters.forEach(e -> e.init(this, brokerBase, environment));
-    gateway.init(this, brokerBase, environment);
-    backpressure.init(this, brokerBase, environment);
+    network.init(this, brokerBase);
+    cluster.init(this, brokerBase);
+    threads.init(this, brokerBase);
+    data.init(this, brokerBase);
+    exporters.values().forEach(e -> e.init(this, brokerBase));
+    gateway.init(this, brokerBase);
+    backpressure.init(this, brokerBase);
   }
 
   private void applyEnvironment(final Environment environment) {
     environment
-        .get(EnvironmentConstants.ENV_DEBUG_EXPORTER)
+        .get(ENV_DEBUG_EXPORTER)
         .ifPresent(
             value ->
-                exporters.add(DebugLogExporter.defaultConfig("pretty".equalsIgnoreCase(value))));
+                exporters.put(
+                    DebugLogExporter.defaultExporterId(),
+                    DebugLogExporter.defaultConfig("pretty".equalsIgnoreCase(value))));
   }
 
   public NetworkCfg getNetwork() {
@@ -78,11 +89,11 @@ public class BrokerCfg {
     this.data = logs;
   }
 
-  public List<ExporterCfg> getExporters() {
+  public Map<String, ExporterCfg> getExporters() {
     return exporters;
   }
 
-  public void setExporters(final List<ExporterCfg> exporters) {
+  public void setExporters(final Map<String, ExporterCfg> exporters) {
     this.exporters = exporters;
   }
 
@@ -90,7 +101,7 @@ public class BrokerCfg {
     return gateway;
   }
 
-  public BrokerCfg setGateway(EmbeddedGatewayCfg gateway) {
+  public BrokerCfg setGateway(final EmbeddedGatewayCfg gateway) {
     this.gateway = gateway;
     return this;
   }
@@ -99,9 +110,17 @@ public class BrokerCfg {
     return backpressure;
   }
 
-  public BrokerCfg setBackpressure(BackpressureCfg backpressure) {
+  public BrokerCfg setBackpressure(final BackpressureCfg backpressure) {
     this.backpressure = backpressure;
     return this;
+  }
+
+  public Duration getStepTimeout() {
+    return stepTimeout;
+  }
+
+  public void setStepTimeout(final Duration stepTimeout) {
+    this.stepTimeout = stepTimeout;
   }
 
   @Override
@@ -119,6 +138,11 @@ public class BrokerCfg {
         + exporters
         + ", gateway="
         + gateway
+        + ", backpressure="
+        + backpressure
+        + ", stepTimeout='"
+        + stepTimeout
+        + '\''
         + '}';
   }
 

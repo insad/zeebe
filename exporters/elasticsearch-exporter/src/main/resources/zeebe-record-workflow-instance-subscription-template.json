@@ -1,6 +1,6 @@
 {
   "index_patterns": [
-    "zeebe-record-workflow-instance-subscription_*"
+    "zeebe-record_workflow-instance-subscription_*"
   ],
   "order": 20,
   "aliases": {
@@ -23,6 +23,15 @@
             },
             "variables": {
               "enabled": false
+            },
+            "bpmnProcessId": {
+              "type": "keyword"
+            },
+            "messageKey": {
+              "type": "long"
+            },
+            "correlationKey": {
+              "type": "keyword"
             }
           }
         }

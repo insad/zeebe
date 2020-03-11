@@ -44,7 +44,7 @@ import org.junit.Rule;
 import org.junit.rules.ExternalResource;
 import org.junit.rules.TemporaryFolder;
 
-public class IncidentStreamProcessorRule extends ExternalResource {
+public final class IncidentStreamProcessorRule extends ExternalResource {
 
   @Rule public TemporaryFolder folder = new TemporaryFolder();
   private final StreamProcessorRule environmentRule;
@@ -54,7 +54,7 @@ public class IncidentStreamProcessorRule extends ExternalResource {
   private WorkflowState workflowState;
   private ZeebeState zeebeState;
 
-  public IncidentStreamProcessorRule(StreamProcessorRule streamProcessorRule) {
+  public IncidentStreamProcessorRule(final StreamProcessorRule streamProcessorRule) {
     environmentRule = streamProcessorRule;
   }
 
@@ -64,18 +64,18 @@ public class IncidentStreamProcessorRule extends ExternalResource {
     mockTimerEventScheduler = mock(DueDateTimerChecker.class);
 
     when(mockSubscriptionCommandSender.openMessageSubscription(
-            anyInt(), anyLong(), anyLong(), any(), any(), anyBoolean()))
+            anyInt(), anyLong(), anyLong(), any(), any(), any(), anyBoolean()))
         .thenReturn(true);
     when(mockSubscriptionCommandSender.correlateMessageSubscription(
-            anyInt(), anyLong(), anyLong(), any()))
+            anyInt(), anyLong(), anyLong(), any(), any()))
         .thenReturn(true);
     when(mockSubscriptionCommandSender.closeMessageSubscription(
             anyInt(), anyLong(), anyLong(), any(DirectBuffer.class)))
         .thenReturn(true);
 
     environmentRule.startTypedStreamProcessor(
-        (typedRecordProcessors, zeebeState) -> {
-          this.zeebeState = zeebeState;
+        (typedRecordProcessors, processingContext) -> {
+          zeebeState = processingContext.getZeebeState();
           workflowState = zeebeState.getWorkflowState();
           final BpmnStepProcessor stepProcessor =
               WorkflowEventProcessors.addWorkflowProcessors(
@@ -85,9 +85,13 @@ public class IncidentStreamProcessorRule extends ExternalResource {
                   new CatchEventBehavior(zeebeState, mockSubscriptionCommandSender, 1),
                   mockTimerEventScheduler);
 
-          IncidentEventProcessors.addProcessors(typedRecordProcessors, zeebeState, stepProcessor);
-          JobEventProcessors.addJobProcessors(
-              typedRecordProcessors, zeebeState, type -> {}, Integer.MAX_VALUE);
+          final var jobErrorThrownProcessor =
+              JobEventProcessors.addJobProcessors(
+                  typedRecordProcessors, zeebeState, type -> {}, Integer.MAX_VALUE);
+
+          IncidentEventProcessors.addProcessors(
+              typedRecordProcessors, zeebeState, stepProcessor, jobErrorThrownProcessor);
+
           return typedRecordProcessors;
         });
   }
@@ -164,7 +168,7 @@ public class IncidentStreamProcessorRule extends ExternalResource {
         .get();
   }
 
-  public void awaitIncidentInState(Intent state) {
+  public void awaitIncidentInState(final Intent state) {
     waitUntil(
         () ->
             environmentRule
@@ -176,7 +180,7 @@ public class IncidentStreamProcessorRule extends ExternalResource {
                 .isPresent());
   }
 
-  public void awaitIncidentRejection(Intent state) {
+  public void awaitIncidentRejection(final Intent state) {
     waitUntil(
         () ->
             environmentRule

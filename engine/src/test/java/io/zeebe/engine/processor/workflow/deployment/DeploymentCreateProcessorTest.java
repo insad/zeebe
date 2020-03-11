@@ -28,9 +28,10 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.MockitoAnnotations;
 
-public class DeploymentCreateProcessorTest {
+public final class DeploymentCreateProcessorTest {
   @Rule
-  public StreamProcessorRule rule = new StreamProcessorRule(Protocol.DEPLOYMENT_PARTITION + 1);
+  public final StreamProcessorRule rule =
+      new StreamProcessorRule(Protocol.DEPLOYMENT_PARTITION + 1);
 
   private WorkflowState workflowState;
 
@@ -38,7 +39,8 @@ public class DeploymentCreateProcessorTest {
   public void setUp() {
     MockitoAnnotations.initMocks(this);
     rule.startTypedStreamProcessor(
-        (typedRecordProcessors, zeebeState) -> {
+        (typedRecordProcessors, processingContext) -> {
+          final var zeebeState = processingContext.getZeebeState();
           workflowState = zeebeState.getWorkflowState();
           DeploymentEventProcessors.addDeploymentCreateProcessor(
               typedRecordProcessors,

@@ -76,7 +76,8 @@ public abstract class AbstractFlowNodeBuilder<
       getCurrentSequenceFlowBuilder().name(name);
     }
     final ConditionExpression conditionExpression = createInstance(ConditionExpression.class);
-    conditionExpression.setTextContent(condition);
+    final String zeebeExpression = asZeebeExpression(condition);
+    conditionExpression.setTextContent(zeebeExpression);
     getCurrentSequenceFlowBuilder().condition(conditionExpression);
     return myself;
   }
@@ -245,6 +246,12 @@ public abstract class AbstractFlowNodeBuilder<
     return createTarget(EndEvent.class, id).builder();
   }
 
+  public EndEventBuilder endEvent(final String id, final Consumer<EndEventBuilder> consumer) {
+    final EndEventBuilder builder = endEvent(id);
+    consumer.accept(builder);
+    return builder;
+  }
+
   public ParallelGatewayBuilder parallelGateway() {
     return createTarget(ParallelGateway.class).builder();
   }
@@ -309,6 +316,13 @@ public abstract class AbstractFlowNodeBuilder<
     return createTarget(CallActivity.class, id).builder();
   }
 
+  public CallActivityBuilder callActivity(
+      final String id, final Consumer<CallActivityBuilder> consumer) {
+    final CallActivityBuilder builder = createTarget(CallActivity.class, id).builder();
+    consumer.accept(builder);
+    return builder;
+  }
+
   public SubProcessBuilder subProcess() {
     return createTarget(SubProcess.class).builder();
   }
@@ -318,7 +332,6 @@ public abstract class AbstractFlowNodeBuilder<
   }
 
   public SubProcessBuilder subProcess(final String id, final Consumer<SubProcessBuilder> consumer) {
-
     final SubProcessBuilder builder = createTarget(SubProcess.class, id).builder();
     consumer.accept(builder);
     return builder;

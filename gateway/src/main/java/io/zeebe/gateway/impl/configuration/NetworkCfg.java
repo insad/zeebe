@@ -8,22 +8,18 @@
 package io.zeebe.gateway.impl.configuration;
 
 import static io.zeebe.gateway.impl.configuration.ConfigurationDefaults.DEFAULT_PORT;
-import static io.zeebe.gateway.impl.configuration.EnvironmentConstants.ENV_GATEWAY_HOST;
-import static io.zeebe.gateway.impl.configuration.EnvironmentConstants.ENV_GATEWAY_PORT;
 
-import io.zeebe.transport.SocketAddress;
-import io.zeebe.util.Environment;
+import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.Objects;
 
-public class NetworkCfg {
+public final class NetworkCfg {
 
   private String host;
   private int port = DEFAULT_PORT;
+  private Duration minKeepAliveInterval = Duration.ofSeconds(30);
 
-  public void init(Environment environment, String defaultHost) {
-    environment.get(ENV_GATEWAY_HOST).ifPresent(this::setHost);
-    environment.getInt(ENV_GATEWAY_PORT).ifPresent(this::setPort);
-
+  public void init(final String defaultHost) {
     if (host == null) {
       host = defaultHost;
     }
@@ -33,7 +29,7 @@ public class NetworkCfg {
     return host;
   }
 
-  public NetworkCfg setHost(String host) {
+  public NetworkCfg setHost(final String host) {
     this.host = host;
     return this;
   }
@@ -42,13 +38,22 @@ public class NetworkCfg {
     return port;
   }
 
-  public NetworkCfg setPort(int port) {
+  public NetworkCfg setPort(final int port) {
     this.port = port;
     return this;
   }
 
-  public SocketAddress toSocketAddress() {
-    return new SocketAddress(host, port);
+  public Duration getMinKeepAliveInterval() {
+    return minKeepAliveInterval;
+  }
+
+  public NetworkCfg setMinKeepAliveInterval(final Duration keepAlive) {
+    this.minKeepAliveInterval = keepAlive;
+    return this;
+  }
+
+  public InetSocketAddress toSocketAddress() {
+    return new InetSocketAddress(host, port);
   }
 
   @Override
@@ -57,7 +62,7 @@ public class NetworkCfg {
   }
 
   @Override
-  public boolean equals(Object o) {
+  public boolean equals(final Object o) {
     if (this == o) {
       return true;
     }
@@ -70,6 +75,14 @@ public class NetworkCfg {
 
   @Override
   public String toString() {
-    return "NetworkCfg{" + "host='" + host + '\'' + ", port=" + port + '}';
+    return "NetworkCfg{"
+        + "host='"
+        + host
+        + '\''
+        + ", port="
+        + port
+        + ", minKeepAliveInterval="
+        + minKeepAliveInterval
+        + '}';
   }
 }

@@ -10,10 +10,11 @@ package io.zeebe.logstreams.log;
 import static io.zeebe.util.buffer.BufferUtil.wrapString;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.zeebe.logstreams.impl.LogEntryDescriptor;
+import io.zeebe.logstreams.impl.log.LogEntryDescriptor;
 import io.zeebe.logstreams.util.LogStreamReaderRule;
 import io.zeebe.logstreams.util.LogStreamRule;
 import io.zeebe.logstreams.util.LogStreamWriterRule;
+import io.zeebe.logstreams.util.SynchronousLogStream;
 import io.zeebe.util.buffer.DirectBufferWriter;
 import io.zeebe.util.sched.future.ActorFuture;
 import io.zeebe.util.sched.testing.ControlledActorSchedulerRule;
@@ -21,6 +22,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import org.agrona.DirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -28,7 +30,7 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 
-public class LogStreamWriterTest {
+public final class LogStreamWriterTest {
   private static final DirectBuffer EVENT_VALUE = wrapString("value");
   private static final DirectBuffer EVENT_METADATA = wrapString("metadata");
 
@@ -38,10 +40,10 @@ public class LogStreamWriterTest {
 
   @Rule public ExpectedException expectedException = ExpectedException.none();
 
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
-  public LogStreamRule logStreamRule = LogStreamRule.startByDefault(temporaryFolder);
-  public LogStreamReaderRule readerRule = new LogStreamReaderRule(logStreamRule);
-  public LogStreamWriterRule writerRule = new LogStreamWriterRule(logStreamRule);
+  public final TemporaryFolder temporaryFolder = new TemporaryFolder();
+  public final LogStreamRule logStreamRule = LogStreamRule.startByDefault(temporaryFolder);
+  public final LogStreamReaderRule readerRule = new LogStreamReaderRule(logStreamRule);
+  public final LogStreamWriterRule writerRule = new LogStreamWriterRule(logStreamRule);
 
   @Rule
   public RuleChain ruleChain =
@@ -54,7 +56,13 @@ public class LogStreamWriterTest {
 
   @Before
   public void setUp() {
-    writer = new LogStreamWriterImpl(logStreamRule.getLogStream());
+    final SynchronousLogStream logStream = logStreamRule.getLogStream();
+    writer = logStream.newLogStreamRecordWriter();
+  }
+
+  @After
+  public void tearDown() {
+    writer = null;
   }
 
   private LoggedEvent getWrittenEvent(final long position) {
@@ -178,6 +186,41 @@ public class LogStreamWriterTest {
 
     // then
     assertThat(getWrittenEvent(position).getKey()).isEqualTo(123L);
+  }
+
+  @Test
+  public void shouldWriteEventsWithDifferentWriters() {
+    // given
+    final long firstPosition = writer.key(123L).value(EVENT_VALUE).tryWrite();
+
+    // when
+    final SynchronousLogStream logStream = logStreamRule.getLogStream();
+    writer = logStream.newLogStreamRecordWriter();
+    final long secondPosition = writer.key(124L).value(EVENT_VALUE).tryWrite();
+
+    // then
+    assertThat(secondPosition).isGreaterThan(firstPosition);
+    assertThat(getWrittenEvent(firstPosition).getKey()).isEqualTo(123L);
+    assertThat(getWrittenEvent(secondPosition).getKey()).isEqualTo(124L);
+  }
+
+  @Test
+  public void shouldCloseAllWritersAndWriteAgain() {
+    // given
+    final long firstPosition = writer.key(123L).value(EVENT_VALUE).tryWrite();
+    writerRule.waitForPositionToBeAppended(firstPosition);
+
+    // when
+    writerRule.closeWriter();
+
+    final SynchronousLogStream logStream = logStreamRule.getLogStream();
+    writer = logStream.newLogStreamRecordWriter();
+    final long secondPosition = writer.key(124L).value(EVENT_VALUE).tryWrite();
+
+    // then
+    assertThat(secondPosition).isGreaterThan(firstPosition);
+    assertThat(getWrittenEvent(firstPosition).getKey()).isEqualTo(123L);
+    assertThat(getWrittenEvent(secondPosition).getKey()).isEqualTo(124L);
   }
 
   @Test

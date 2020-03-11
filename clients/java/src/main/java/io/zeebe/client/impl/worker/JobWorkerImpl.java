@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 
-public class JobWorkerImpl implements JobWorker, Closeable {
+public final class JobWorkerImpl implements JobWorker, Closeable {
 
   private static final Logger LOG = Loggers.JOB_WORKER_LOGGER;
 
@@ -46,11 +46,11 @@ public class JobWorkerImpl implements JobWorker, Closeable {
   private final AtomicReference<JobPoller> jobPoller;
 
   public JobWorkerImpl(
-      int maxJobsActive,
-      ScheduledExecutorService executor,
-      Duration pollInterval,
-      JobRunnableFactory jobRunnableFactory,
-      JobPoller jobPoller) {
+      final int maxJobsActive,
+      final ScheduledExecutorService executor,
+      final Duration pollInterval,
+      final JobRunnableFactory jobRunnableFactory,
+      final JobPoller jobPoller) {
 
     this.maxJobsActive = maxJobsActive;
     this.activationThreshold = Math.round(maxJobsActive * 0.3f);
@@ -102,8 +102,9 @@ public class JobWorkerImpl implements JobWorker, Closeable {
               activatedJobs -> {
                 remainingJobs.addAndGet(activatedJobs);
                 this.jobPoller.set(jobPoller);
-              });
-        } catch (Exception e) {
+              },
+              this::isOpen);
+        } catch (final Exception e) {
           LOG.warn("Failed to activate jobs", e);
           this.jobPoller.set(jobPoller);
         }
@@ -113,11 +114,11 @@ public class JobWorkerImpl implements JobWorker, Closeable {
     }
   }
 
-  private boolean shouldActivateJobs(int remainingJobs) {
+  private boolean shouldActivateJobs(final int remainingJobs) {
     return acquiringJobs.get() && remainingJobs <= activationThreshold;
   }
 
-  private void submitJob(ActivatedJob job) {
+  private void submitJob(final ActivatedJob job) {
     executor.execute(jobRunnableFactory.create(job, this::jobHandlerFinished));
   }
 

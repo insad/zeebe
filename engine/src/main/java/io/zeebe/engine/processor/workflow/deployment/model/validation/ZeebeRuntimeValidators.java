@@ -7,19 +7,42 @@
  */
 package io.zeebe.engine.processor.workflow.deployment.model.validation;
 
+import io.zeebe.el.ExpressionLanguage;
+import io.zeebe.model.bpmn.instance.ConditionExpression;
+import io.zeebe.model.bpmn.instance.zeebe.ZeebeCalledElement;
+import io.zeebe.model.bpmn.instance.zeebe.ZeebeInput;
+import io.zeebe.model.bpmn.instance.zeebe.ZeebeLoopCharacteristics;
+import io.zeebe.model.bpmn.instance.zeebe.ZeebeOutput;
+import io.zeebe.model.bpmn.instance.zeebe.ZeebeSubscription;
 import java.util.Collection;
 import java.util.List;
 import org.camunda.bpm.model.xml.validation.ModelElementValidator;
 
-public class ZeebeRuntimeValidators {
+public final class ZeebeRuntimeValidators {
 
-  private static final ZeebeExpressionValidator EXPRESSION_VALIDATOR =
-      new ZeebeExpressionValidator();
-  public static final Collection<ModelElementValidator<?>> VALIDATORS =
-      List.of(
-          new ZeebeInputValidator(EXPRESSION_VALIDATOR),
-          new ZeebeOutputValidator(EXPRESSION_VALIDATOR),
-          new SequenceFlowValidator(EXPRESSION_VALIDATOR),
-          new ZeebeSubscriptionValidator(EXPRESSION_VALIDATOR),
-          new ZeebeLoopCharacteristicsValidator(EXPRESSION_VALIDATOR));
+  public static final Collection<ModelElementValidator<?>> getValidators(
+      final ExpressionLanguage expressionLanguage) {
+    return List.of(
+        ZeebeJsonPathValidator.verifyThat(ZeebeInput.class)
+            .hasValidPathExpression(ZeebeInput::getSource)
+            .hasValidPathExpression(ZeebeInput::getTarget)
+            .build(),
+        ZeebeJsonPathValidator.verifyThat(ZeebeOutput.class)
+            .hasValidPathExpression(ZeebeOutput::getSource)
+            .hasValidPathExpression(ZeebeOutput::getTarget)
+            .build(),
+        ZeebeJsonPathValidator.verifyThat(ZeebeSubscription.class)
+            .hasValidPathExpression(ZeebeSubscription::getCorrelationKey)
+            .build(),
+        ZeebeJsonPathValidator.verifyThat(ZeebeLoopCharacteristics.class)
+            .hasValidPathExpression(ZeebeLoopCharacteristics::getInputCollection)
+            .hasValidPathExpression(ZeebeLoopCharacteristics::getOutputElement)
+            .build(),
+        ZeebeExpressionValidator.verifyThat(ZeebeCalledElement.class)
+            .hasValidExpression(ZeebeCalledElement::getProcessId)
+            .build(expressionLanguage),
+        ZeebeExpressionValidator.verifyThat(ConditionExpression.class)
+            .hasValidExpression(ConditionExpression::getTextContent)
+            .build(expressionLanguage));
+  }
 }

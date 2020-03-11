@@ -13,10 +13,7 @@ import io.zeebe.util.EnsureUtil;
 import org.agrona.DirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
-public class MsgPackMergeTool {
-
-  /** The maximum JSON key length. */
-  public static final int MAX_JSON_KEY_LEN = 256;
+public final class MsgPackMergeTool {
 
   /**
    * The message for the exception, which is thrown if the resulting document is not a map (json
@@ -25,10 +22,6 @@ public class MsgPackMergeTool {
   public static final String EXCEPTION_MSG_RESULTING_DOCUMENT_IS_NOT_OF_TYPE_MAP =
       "Processing failed, since mapping will result in a non map object (json object).";
 
-  /** The message for the exception which is thrown if the mapping is either null or empty. */
-  public static final String EXCEPTION_MSG_MAPPING_NULL_NOR_EMPTY =
-      "Mapping must be neither null nor empty!";
-
   private final MsgPackDocumentIndexer documentIndexer;
   private final MsgPackDocumentExtractor documentExtractor;
   private final MsgPackDocumentTreeWriter treeWriter;
@@ -36,10 +29,10 @@ public class MsgPackMergeTool {
   private final MsgPackTree currentTree = new MsgPackTree();
   private final UnsafeBuffer resultBuffer = new UnsafeBuffer(0, 0);
 
-  public MsgPackMergeTool(int initialDocumentSize) {
-    this.documentIndexer = new MsgPackDocumentIndexer();
-    this.documentExtractor = new MsgPackDocumentExtractor();
-    this.treeWriter = new MsgPackDocumentTreeWriter(initialDocumentSize);
+  public MsgPackMergeTool(final int initialDocumentSize) {
+    documentIndexer = new MsgPackDocumentIndexer();
+    documentExtractor = new MsgPackDocumentExtractor();
+    treeWriter = new MsgPackDocumentTreeWriter(initialDocumentSize);
 
     reset();
   }
@@ -49,26 +42,15 @@ public class MsgPackMergeTool {
   }
 
   /**
-   * Throws no mapping exceptions. Assumes default values in case a mapping has ambiguous results.
-   */
-  public void mergeDocument(DirectBuffer document, Mapping... mappings) {
-    mergeDocument(document, false, mappings);
-  }
-
-  /**
    * Throws exceptions on ambiguous mapping results
    *
    * @throws MappingException in case a mapping has ambiguous results
    */
-  public void mergeDocumentStrictly(DirectBuffer document, Mapping... mappings) {
-    mergeDocument(document, true, mappings);
-  }
-
-  private void mergeDocument(DirectBuffer document, boolean strictMode, Mapping... mappings) {
+  public void mergeDocument(final DirectBuffer document, final Mapping... mappings) {
     EnsureUtil.ensureNotNull("document", document);
 
     if (mappings != null && mappings.length > 0) {
-      final MsgPackDiff diff = documentExtractor.extract(document, strictMode, mappings);
+      final MsgPackDiff diff = documentExtractor.extract(document, mappings);
       diff.mergeInto(currentTree);
     } else {
       final MsgPackDiff diff = documentIndexer.index(document);
@@ -88,7 +70,7 @@ public class MsgPackMergeTool {
     return resultBuffer;
   }
 
-  private void ensureDocumentIsAMsgPackMap(DirectBuffer document, String exceptionMsg) {
+  private void ensureDocumentIsAMsgPackMap(final DirectBuffer document, final String exceptionMsg) {
     final byte b = document.getByte(0);
     final MsgPackFormat format = MsgPackFormat.valueOf(b);
     if (format.getType() != MsgPackType.MAP && format.getType() != MsgPackType.NIL) {

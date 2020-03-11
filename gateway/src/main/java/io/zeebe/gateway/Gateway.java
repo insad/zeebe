@@ -15,30 +15,25 @@ import io.grpc.netty.NettyServerBuilder;
 import io.zeebe.gateway.impl.broker.BrokerClient;
 import io.zeebe.gateway.impl.broker.BrokerClientImpl;
 import io.zeebe.gateway.impl.configuration.GatewayCfg;
+import io.zeebe.gateway.impl.configuration.NetworkCfg;
 import io.zeebe.gateway.impl.configuration.SecurityCfg;
 import io.zeebe.gateway.impl.job.LongPollingActivateJobsHandler;
+import io.zeebe.util.VersionUtil;
 import io.zeebe.util.sched.ActorScheduler;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import me.dinowernli.grpc.prometheus.Configuration;
 import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 import org.slf4j.Logger;
 
-public class Gateway {
-
-  public static final String VERSION;
+public final class Gateway {
   private static final Logger LOG = Loggers.GATEWAY_LOGGER;
   private static final Function<GatewayCfg, ServerBuilder> DEFAULT_SERVER_BUILDER_FACTORY =
-      cfg ->
-          NettyServerBuilder.forAddress(
-              new InetSocketAddress(cfg.getNetwork().getHost(), cfg.getNetwork().getPort()));
-
-  static {
-    final String version = Gateway.class.getPackage().getImplementationVersion();
-    VERSION = version != null ? version : "development";
-  }
+      cfg -> setNetworkConfig(cfg.getNetwork());
 
   private final Function<GatewayCfg, ServerBuilder> serverBuilderFactory;
   private final Function<GatewayCfg, BrokerClient> brokerClientFactory;
@@ -49,7 +44,9 @@ public class Gateway {
   private BrokerClient brokerClient;
 
   public Gateway(
-      GatewayCfg gatewayCfg, AtomixCluster atomixCluster, ActorScheduler actorScheduler) {
+      final GatewayCfg gatewayCfg,
+      final AtomixCluster atomixCluster,
+      final ActorScheduler actorScheduler) {
     this(
         gatewayCfg,
         cfg -> new BrokerClientImpl(cfg, atomixCluster),
@@ -58,17 +55,17 @@ public class Gateway {
   }
 
   public Gateway(
-      GatewayCfg gatewayCfg,
-      Function<GatewayCfg, BrokerClient> brokerClientFactory,
-      ActorScheduler actorScheduler) {
+      final GatewayCfg gatewayCfg,
+      final Function<GatewayCfg, BrokerClient> brokerClientFactory,
+      final ActorScheduler actorScheduler) {
     this(gatewayCfg, brokerClientFactory, DEFAULT_SERVER_BUILDER_FACTORY, actorScheduler);
   }
 
   public Gateway(
-      GatewayCfg gatewayCfg,
-      Function<GatewayCfg, BrokerClient> brokerClientFactory,
-      Function<GatewayCfg, ServerBuilder> serverBuilderFactory,
-      ActorScheduler actorScheduler) {
+      final GatewayCfg gatewayCfg,
+      final Function<GatewayCfg, BrokerClient> brokerClientFactory,
+      final Function<GatewayCfg, ServerBuilder> serverBuilderFactory,
+      final ActorScheduler actorScheduler) {
     this.gatewayCfg = gatewayCfg;
     this.brokerClientFactory = brokerClientFactory;
     this.serverBuilderFactory = serverBuilderFactory;
@@ -84,13 +81,14 @@ public class Gateway {
   }
 
   public void start() throws IOException {
-    LOG.info("Version: {}", VERSION);
-    LOG.info("Starting gateway with configuration {}", gatewayCfg.toJson());
+    if (LOG.isInfoEnabled()) {
+      LOG.info("Version: {}", VersionUtil.getVersion());
+      LOG.info("Starting gateway with configuration {}", gatewayCfg.toJson());
+    }
 
     brokerClient = buildBrokerClient();
 
-    final LongPollingActivateJobsHandler longPollingHandler =
-        LongPollingActivateJobsHandler.newBuilder().setBrokerClient(brokerClient).build();
+    final LongPollingActivateJobsHandler longPollingHandler = buildLongPollingHandler(brokerClient);
     actorScheduler.submitActor(longPollingHandler);
 
     final EndpointManager endpointManager = new EndpointManager(brokerClient, longPollingHandler);
@@ -107,7 +105,6 @@ public class Gateway {
     }
 
     final SecurityCfg securityCfg = gatewayCfg.getSecurity();
-
     if (securityCfg.isEnabled()) {
       setSecurityConfig(serverBuilder, securityCfg);
     }
@@ -115,6 +112,18 @@ public class Gateway {
     server = serverBuilder.build();
 
     server.start();
+  }
+
+  private static NettyServerBuilder setNetworkConfig(final NetworkCfg cfg) {
+    final Duration minKeepAliveInterval = cfg.getMinKeepAliveInterval();
+
+    if (minKeepAliveInterval.isNegative() || minKeepAliveInterval.isZero()) {
+      throw new IllegalArgumentException("Minimum keep alive interval must be positive.");
+    }
+
+    return NettyServerBuilder.forAddress(new InetSocketAddress(cfg.getHost(), cfg.getPort()))
+        .permitKeepAliveTime(minKeepAliveInterval.toMillis(), TimeUnit.MILLISECONDS)
+        .permitKeepAliveWithoutCalls(false);
   }
 
   private void setSecurityConfig(final ServerBuilder serverBuilder, final SecurityCfg security) {
@@ -150,8 +159,12 @@ public class Gateway {
     serverBuilder.useTransportSecurity(certChain, privateKey);
   }
 
-  protected BrokerClient buildBrokerClient() {
+  private BrokerClient buildBrokerClient() {
     return brokerClientFactory.apply(gatewayCfg);
+  }
+
+  private LongPollingActivateJobsHandler buildLongPollingHandler(final BrokerClient brokerClient) {
+    return LongPollingActivateJobsHandler.newBuilder().setBrokerClient(brokerClient).build();
   }
 
   public void listenAndServe() throws InterruptedException, IOException {
@@ -164,8 +177,9 @@ public class Gateway {
       server.shutdownNow();
       try {
         server.awaitTermination();
-      } catch (InterruptedException e) {
+      } catch (final InterruptedException e) {
         LOG.error("Failed to await termination of gateway", e);
+        Thread.currentThread().interrupt();
       } finally {
         server = null;
       }

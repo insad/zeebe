@@ -8,13 +8,18 @@
   <parent>
     <groupId>io.zeebe</groupId>
     <artifactId>zeebe-qa</artifactId>
-    <version>0.21.0-SNAPSHOT</version>
+    <version>0.23.0-SNAPSHOT</version>
   </parent>
 
   <dependencies>
     <dependency>
       <groupId>io.zeebe</groupId>
       <artifactId>zeebe-broker</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.zeebe</groupId>
+      <artifactId>zeebe-logstreams</artifactId>
     </dependency>
 
     <dependency>
@@ -59,21 +64,6 @@
 
     <dependency>
       <groupId>io.zeebe</groupId>
-      <artifactId>zeebe-service-container</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>io.zeebe</groupId>
-      <artifactId>zeebe-transport</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>io.zeebe</groupId>
-      <artifactId>zeebe-logstreams</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>io.zeebe</groupId>
       <artifactId>atomix-cluster</artifactId>
     </dependency>
 
@@ -85,16 +75,6 @@
     <dependency>
       <groupId>io.zeebe</groupId>
       <artifactId>atomix</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>io.zeebe</groupId>
-      <artifactId>atomix-raft</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>io.zeebe</groupId>
-      <artifactId>atomix-primitive</artifactId>
     </dependency>
 
     <dependency>
@@ -144,6 +124,12 @@
       <artifactId>hamcrest</artifactId>
       <scope>test</scope>
     </dependency>
+
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-core</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -152,7 +138,6 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <rerunFailingTestsCount>5</rerunFailingTestsCount>
           <argLine>-Xmx2048m -XX:MaxDirectMemorySize=4g</argLine>
         </configuration>
       </plugin>

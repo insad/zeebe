@@ -32,7 +32,7 @@ public class ElasticsearchExporter implements Exporter {
   private boolean indexTemplatesCreated;
 
   @Override
-  public void configure(Context context) {
+  public void configure(final Context context) {
     log = context.getLogger();
     configuration =
         context.getConfiguration().instantiate(ElasticsearchExporterConfiguration.class);
@@ -42,7 +42,7 @@ public class ElasticsearchExporter implements Exporter {
   }
 
   @Override
-  public void open(Controller controller) {
+  public void open(final Controller controller) {
     this.controller = controller;
     client = createClient();
 
@@ -52,18 +52,24 @@ public class ElasticsearchExporter implements Exporter {
 
   @Override
   public void close() {
-    flush();
+
+    try {
+      flush();
+    } catch (final Exception e) {
+      log.warn("Failed to flush records before closing exporter.", e);
+    }
 
     try {
       client.close();
-    } catch (Exception e) {
+    } catch (final Exception e) {
       log.warn("Failed to close elasticsearch client", e);
     }
+
     log.info("Exporter closed");
   }
 
   @Override
-  public void export(Record record) {
+  public void export(final Record record) {
     if (!indexTemplatesCreated) {
       createIndexTemplates();
     }
@@ -81,7 +87,12 @@ public class ElasticsearchExporter implements Exporter {
   }
 
   private void flushAndReschedule() {
-    flush();
+    try {
+      flush();
+    } catch (final Exception e) {
+      log.error(
+          "Unexpected exception occurred on periodically flushing bulk, will retry later.", e);
+    }
     scheduleDelayedFlush();
   }
 
@@ -146,8 +157,9 @@ public class ElasticsearchExporter implements Exporter {
 
   private void createRootIndexTemplate() {
     final String templateName = configuration.index.prefix;
+    final String aliasName = configuration.index.prefix;
     final String filename = ZEEBE_RECORD_TEMPLATE_JSON;
-    if (!client.putIndexTemplate(templateName, filename, "-")) {
+    if (!client.putIndexTemplate(templateName, aliasName, filename)) {
       log.warn("Put index template {} from file {} was not acknowledged", templateName, filename);
     }
   }
@@ -162,17 +174,17 @@ public class ElasticsearchExporter implements Exporter {
 
     private final ElasticsearchExporterConfiguration configuration;
 
-    ElasticsearchRecordFilter(ElasticsearchExporterConfiguration configuration) {
+    ElasticsearchRecordFilter(final ElasticsearchExporterConfiguration configuration) {
       this.configuration = configuration;
     }
 
     @Override
-    public boolean acceptType(RecordType recordType) {
+    public boolean acceptType(final RecordType recordType) {
       return configuration.shouldIndexRecordType(recordType);
     }
 
     @Override
-    public boolean acceptValue(ValueType valueType) {
+    public boolean acceptValue(final ValueType valueType) {
       return configuration.shouldIndexValueType(valueType);
     }
   }

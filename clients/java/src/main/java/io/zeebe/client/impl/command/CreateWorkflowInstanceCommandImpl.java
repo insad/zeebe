@@ -26,16 +26,16 @@ import io.zeebe.client.impl.RetriableClientFutureImpl;
 import io.zeebe.client.impl.ZeebeObjectMapper;
 import io.zeebe.client.impl.response.CreateWorkflowInstanceResponseImpl;
 import io.zeebe.gateway.protocol.GatewayGrpc.GatewayStub;
+import io.zeebe.gateway.protocol.GatewayOuterClass;
 import io.zeebe.gateway.protocol.GatewayOuterClass.CreateWorkflowInstanceRequest;
 import io.zeebe.gateway.protocol.GatewayOuterClass.CreateWorkflowInstanceRequest.Builder;
-import io.zeebe.gateway.protocol.GatewayOuterClass.CreateWorkflowInstanceResponse;
 import java.io.InputStream;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
-public class CreateWorkflowInstanceCommandImpl
+public final class CreateWorkflowInstanceCommandImpl
     implements CreateWorkflowInstanceCommandStep1,
         CreateWorkflowInstanceCommandStep2,
         CreateWorkflowInstanceCommandStep3 {
@@ -47,10 +47,10 @@ public class CreateWorkflowInstanceCommandImpl
   private Duration requestTimeout;
 
   public CreateWorkflowInstanceCommandImpl(
-      GatewayStub asyncStub,
-      ZeebeObjectMapper objectMapper,
-      Duration requestTimeout,
-      Predicate<Throwable> retryPredicate) {
+      final GatewayStub asyncStub,
+      final ZeebeObjectMapper objectMapper,
+      final Duration requestTimeout,
+      final Predicate<Throwable> retryPredicate) {
     this.asyncStub = asyncStub;
     this.objectMapper = objectMapper;
     this.requestTimeout = requestTimeout;
@@ -60,26 +60,32 @@ public class CreateWorkflowInstanceCommandImpl
   }
 
   @Override
-  public CreateWorkflowInstanceCommandStep3 variables(InputStream variables) {
+  public CreateWorkflowInstanceCommandStep3 variables(final InputStream variables) {
     ArgumentUtil.ensureNotNull("variables", variables);
     return setVariables(objectMapper.validateJson("variables", variables));
   }
 
   @Override
-  public CreateWorkflowInstanceCommandStep3 variables(String variables) {
+  public CreateWorkflowInstanceCommandStep3 variables(final String variables) {
     ArgumentUtil.ensureNotNull("variables", variables);
     return setVariables(objectMapper.validateJson("variables", variables));
   }
 
   @Override
-  public CreateWorkflowInstanceCommandStep3 variables(Map<String, Object> variables) {
+  public CreateWorkflowInstanceCommandStep3 variables(final Map<String, Object> variables) {
     return variables((Object) variables);
   }
 
   @Override
-  public CreateWorkflowInstanceCommandStep3 variables(Object variables) {
+  public CreateWorkflowInstanceCommandStep3 variables(final Object variables) {
     ArgumentUtil.ensureNotNull("variables", variables);
     return setVariables(objectMapper.toJson(variables));
+  }
+
+  @Override
+  public CreateWorkflowInstanceWithResultCommandStep1 withResult() {
+    return new CreateWorkflowInstanceWithResultCommandImpl(
+        objectMapper, asyncStub, builder, retryPredicate, requestTimeout);
   }
 
   @Override
@@ -106,7 +112,7 @@ public class CreateWorkflowInstanceCommandImpl
   }
 
   @Override
-  public FinalCommandStep<WorkflowInstanceEvent> requestTimeout(Duration requestTimeout) {
+  public FinalCommandStep<WorkflowInstanceEvent> requestTimeout(final Duration requestTimeout) {
     this.requestTimeout = requestTimeout;
     return this;
   }
@@ -115,25 +121,27 @@ public class CreateWorkflowInstanceCommandImpl
   public ZeebeFuture<WorkflowInstanceEvent> send() {
     final CreateWorkflowInstanceRequest request = builder.build();
 
-    final RetriableClientFutureImpl<WorkflowInstanceEvent, CreateWorkflowInstanceResponse> future =
-        new RetriableClientFutureImpl<>(
-            CreateWorkflowInstanceResponseImpl::new,
-            retryPredicate,
-            streamObserver -> send(request, streamObserver));
+    final RetriableClientFutureImpl<
+            WorkflowInstanceEvent, GatewayOuterClass.CreateWorkflowInstanceResponse>
+        future =
+            new RetriableClientFutureImpl<>(
+                CreateWorkflowInstanceResponseImpl::new,
+                retryPredicate,
+                streamObserver -> send(request, streamObserver));
 
     send(request, future);
     return future;
   }
 
   private void send(
-      CreateWorkflowInstanceRequest request,
-      StreamObserver<CreateWorkflowInstanceResponse> future) {
+      final CreateWorkflowInstanceRequest request,
+      final StreamObserver<GatewayOuterClass.CreateWorkflowInstanceResponse> future) {
     asyncStub
         .withDeadlineAfter(requestTimeout.toMillis(), TimeUnit.MILLISECONDS)
         .createWorkflowInstance(request, future);
   }
 
-  private CreateWorkflowInstanceCommandStep3 setVariables(String jsonDocument) {
+  private CreateWorkflowInstanceCommandStep3 setVariables(final String jsonDocument) {
     builder.setVariables(jsonDocument);
     return this;
   }

@@ -7,21 +7,21 @@
  */
 package io.zeebe.gateway.api.workflow;
 
-import io.zeebe.gateway.api.util.StubbedGateway;
-import io.zeebe.gateway.api.util.StubbedGateway.RequestStub;
+import io.zeebe.gateway.api.util.StubbedBrokerClient;
+import io.zeebe.gateway.api.util.StubbedBrokerClient.RequestStub;
 import io.zeebe.gateway.impl.broker.request.BrokerPublishMessageRequest;
 import io.zeebe.gateway.impl.broker.response.BrokerResponse;
 
-public class PublishMessageStub
+public final class PublishMessageStub
     implements RequestStub<BrokerPublishMessageRequest, BrokerResponse<Void>> {
 
   @Override
-  public void registerWith(StubbedGateway gateway) {
+  public void registerWith(final StubbedBrokerClient gateway) {
     gateway.registerHandler(BrokerPublishMessageRequest.class, this);
   }
 
   @Override
-  public BrokerResponse<Void> handle(BrokerPublishMessageRequest request) throws Exception {
+  public BrokerResponse<Void> handle(final BrokerPublishMessageRequest request) throws Exception {
     return new BrokerResponse<>(null);
   }
 }

@@ -30,22 +30,24 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class BrokerHttpServerHandler extends ChannelInboundHandlerAdapter {
+public final class BrokerHttpServerHandler extends ChannelInboundHandlerAdapter {
 
   private static final String BROKER_READY_STATUS_URI = "/ready";
   private static final String METRICS_URI = "/metrics";
+  private static final String BROKER_HEALTH_STATUS_URI = "/health";
 
   private final CollectorRegistry metricsRegistry;
-  private BrokerHealthCheckService brokerHealthCheckService;
+  private final BrokerHealthCheckService brokerHealthCheckService;
 
   public BrokerHttpServerHandler(
-      CollectorRegistry metricsRegistry, BrokerHealthCheckService brokerHealthCheckService) {
+      final CollectorRegistry metricsRegistry,
+      final BrokerHealthCheckService brokerHealthCheckService) {
     this.metricsRegistry = metricsRegistry;
     this.brokerHealthCheckService = brokerHealthCheckService;
   }
 
   @Override
-  public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+  public void channelRead(final ChannelHandlerContext ctx, final Object msg) throws Exception {
     if (!(msg instanceof HttpRequest)) {
       super.channelRead(ctx, msg);
       return;
@@ -72,6 +74,8 @@ public class BrokerHttpServerHandler extends ChannelInboundHandlerAdapter {
       response = getReadyStatus();
     } else if (METRICS_URI.equals(queryStringDecoder.path())) {
       response = getMetrics(queryStringDecoder);
+    } else if (BROKER_HEALTH_STATUS_URI.equals(queryStringDecoder.path())) {
+      response = getHealthStatus();
     } else {
       response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
     }
@@ -91,13 +95,25 @@ public class BrokerHttpServerHandler extends ChannelInboundHandlerAdapter {
     return response;
   }
 
-  private DefaultFullHttpResponse getMetrics(QueryStringDecoder queryStringDecoder) {
+  private DefaultFullHttpResponse getHealthStatus() {
+    final boolean brokerHealthy = brokerHealthCheckService.isBrokerHealthy();
+    final DefaultFullHttpResponse response;
+    if (brokerHealthy) {
+      response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT);
+    } else {
+      response =
+          new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE);
+    }
+    return response;
+  }
+
+  private DefaultFullHttpResponse getMetrics(final QueryStringDecoder queryStringDecoder) {
     final ByteBuf buf = Unpooled.buffer();
-    try (ByteBufOutputStream os = new ByteBufOutputStream(buf);
-        OutputStreamWriter writer = new OutputStreamWriter(os); ) {
+    try (final ByteBufOutputStream os = new ByteBufOutputStream(buf);
+        final OutputStreamWriter writer = new OutputStreamWriter(os); ) {
       TextFormat.write004(
           writer, metricsRegistry.filteredMetricFamilySamples(metricsFilter(queryStringDecoder)));
-    } catch (IOException e) {
+    } catch (final IOException e) {
       Loggers.SYSTEM_LOGGER.warn("Failed to respond to metrics request", e);
       return new DefaultFullHttpResponse(
           HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
@@ -110,7 +126,7 @@ public class BrokerHttpServerHandler extends ChannelInboundHandlerAdapter {
     return response;
   }
 
-  private static Set<String> metricsFilter(QueryStringDecoder queryStringDecoder) {
+  private static Set<String> metricsFilter(final QueryStringDecoder queryStringDecoder) {
     final List<String> names = queryStringDecoder.parameters().get("name[]");
     if (names != null && !names.isEmpty()) {
       return new HashSet<>(names);

@@ -7,7 +7,6 @@
  */
 package io.zeebe.test.exporter;
 
-import com.moandjiezana.toml.Toml;
 import io.zeebe.broker.system.configuration.BrokerCfg;
 import io.zeebe.broker.system.configuration.ExporterCfg;
 import io.zeebe.exporter.api.Exporter;
@@ -17,8 +16,10 @@ import io.zeebe.protocol.record.Record;
 import io.zeebe.test.exporter.record.MockRecord;
 import io.zeebe.test.exporter.record.MockRecordMetadata;
 import io.zeebe.test.exporter.record.MockRecordStream;
+import io.zeebe.test.util.TestConfigurationFactory;
 import io.zeebe.util.ZbLogger;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.time.Duration;
 import java.util.List;
@@ -43,7 +44,7 @@ public class ExporterTestHarness {
   private long position = 1;
 
   /** @param exporter the exporter to be tested */
-  public ExporterTestHarness(Exporter exporter) {
+  public ExporterTestHarness(final Exporter exporter) {
     this.exporter = exporter;
   }
 
@@ -53,7 +54,7 @@ public class ExporterTestHarness {
    *
    * @param id the ID of the exporter
    */
-  public void configure(String id) throws Exception {
+  public void configure(final String id) throws Exception {
     final MockConfiguration<Object> configuration = new MockConfiguration<>();
     configuration.setId(id);
 
@@ -61,29 +62,29 @@ public class ExporterTestHarness {
   }
 
   /**
-   * Will configure the exporter with the given ID, and parse the input as if it were a partial TOML
+   * Will configure the exporter with the given ID, and parse the input as if it were a partial YAML
    * document; this would allow one to test sample configuration and make sure they're parsed as
    * expected.
    *
-   * <p>The given TOML document can be a partial document which contains strictly the exporter
+   * <p>The given YAML document can be a partial document which contains strictly the exporter
    * definition. For example: <code>
-   * [[exporters]]
-   * id = "elasticsearch"
-   * className = "io.zeebe.exporter.ElasticsearchExporter"
-   *
-   *   [exporters.args.bulk]
-   *   delay = 1
-   *   size = 1
+   * zeebe:
+   *   broker:
+   *     exporters:
+   *       elasticsearsch:
+   *         className: io.zeebe.exporter.ElasticsearchExporter
+   *         args:
+   *         ...
    * </code>
    *
-   * <p>NOTE: the ID of the exporter in the TOML document MUST match the given ID here to avoid any
-   * issues where you would pass a sample TOML document with multiple exporter definitions.
+   * <p>NOTE: the ID of the exporter in the YAML document MUST match the given ID here to avoid any
+   * issues where you would pass a sample YAML document with multiple exporter definitions.
    *
    * @param id id of the exporter
-   * @param toml the reference TOML document
+   * @param yaml the reference YAML document
    */
-  public void configure(String id, InputStream toml) throws Exception {
-    final BrokerCfg config = new Toml().read(toml).to(BrokerCfg.class);
+  public void configure(final String id, final InputStream yaml) throws Exception {
+    final BrokerCfg config = new TestConfigurationFactory().create(yaml, BrokerCfg.class);
     configure(id, config);
   }
 
@@ -92,11 +93,12 @@ public class ExporterTestHarness {
    * transform the file into an {@link InputStream}. See its documentation for more.
    *
    * @param id the exporter ID
-   * @param configFile pointer to a TOML configuration file
+   * @param configFile pointer to a yaml configuration file
    */
-  public void configure(String id, File configFile) throws Exception {
-    final BrokerCfg config = new Toml().read(configFile).to(BrokerCfg.class);
-    configure(id, config);
+  public void configure(final String id, final File configFile) throws Exception {
+    try (InputStream configStream = new FileInputStream(configFile)) {
+      configure(id, configStream);
+    }
   }
 
   /**
@@ -109,7 +111,7 @@ public class ExporterTestHarness {
    * @param config new return value of {@link Configuration#instantiate(Class)}
    * @param <T> type of the configuration class
    */
-  public <T> void configure(String id, T config) throws Exception {
+  public <T> void configure(final String id, final T config) throws Exception {
     final MockConfiguration<T> configuration = new MockConfiguration<>(config);
     configuration.setId(id);
 
@@ -149,7 +151,7 @@ public class ExporterTestHarness {
    * @param record record to export
    * @return exported record
    */
-  public MockRecord export(MockRecord record) {
+  public MockRecord export(final MockRecord record) {
     exporter.export(record);
     position = record.getPosition();
 
@@ -163,7 +165,7 @@ public class ExporterTestHarness {
    * @param configurator a consumer to modify the record, can be null
    * @return the exported record
    */
-  public MockRecord export(Consumer<MockRecord> configurator) {
+  public MockRecord export(final Consumer<MockRecord> configurator) {
     final MockRecord record = generateNextRecord();
 
     if (configurator != null) {
@@ -192,7 +194,7 @@ public class ExporterTestHarness {
    * @param seed the initial sample record
    * @return a stream of {@link MockRecord}
    */
-  public Stream stream(MockRecord seed) {
+  public Stream stream(final MockRecord seed) {
     return new Stream(MockRecordStream.generate(seed));
   }
 
@@ -203,7 +205,7 @@ public class ExporterTestHarness {
    * @param configurator a consumer to modify the record, can be null
    * @return a stream of {@link MockRecord}
    */
-  public Stream stream(Consumer<MockRecord> configurator) {
+  public Stream stream(final Consumer<MockRecord> configurator) {
     final MockRecord seed = generateNextRecord();
     if (configurator != null) {
       configurator.accept(seed);
@@ -218,7 +220,7 @@ public class ExporterTestHarness {
    *
    * @param elapsed time to elapse
    */
-  public void runScheduledTasks(Duration elapsed) {
+  public void runScheduledTasks(final Duration elapsed) {
     controller.runScheduledTasks(elapsed);
   }
 
@@ -252,9 +254,8 @@ public class ExporterTestHarness {
     return controller.getPosition();
   }
 
-  private void configure(String id, BrokerCfg brokerCfg) throws Exception {
-    final Optional<ExporterCfg> config =
-        brokerCfg.getExporters().stream().filter(c -> c.getId().equals(id)).findFirst();
+  private void configure(final String id, final BrokerCfg brokerCfg) throws Exception {
+    final Optional<ExporterCfg> config = Optional.ofNullable(brokerCfg.getExporters().get(id));
 
     if (config.isPresent()) {
       final MockConfiguration<Object> configuration = new MockConfiguration<>();
@@ -267,7 +268,7 @@ public class ExporterTestHarness {
     }
   }
 
-  private <T> MockContext newContext(MockConfiguration<T> configuration) {
+  private <T> MockContext newContext(final MockConfiguration<T> configuration) {
     return new MockContext(logger, configuration);
   }
 
@@ -275,7 +276,7 @@ public class ExporterTestHarness {
     return generateNextRecord(new MockRecord());
   }
 
-  private MockRecord generateNextRecord(MockRecord seed) {
+  private MockRecord generateNextRecord(final MockRecord seed) {
     return ((MockRecord) seed.clone())
         .setMetadata(new MockRecordMetadata().setPartitionId(partitionId))
         .setTimestamp(System.currentTimeMillis())
@@ -284,7 +285,7 @@ public class ExporterTestHarness {
 
   public class Stream extends MockRecordStream {
 
-    public Stream(java.util.stream.Stream<MockRecord> wrappedStream) {
+    public Stream(final java.util.stream.Stream<MockRecord> wrappedStream) {
       super(wrappedStream);
     }
 
@@ -294,7 +295,7 @@ public class ExporterTestHarness {
      *
      * @param count amount of records to export
      */
-    public List<Record> export(int count) {
+    public List<Record> export(final int count) {
       return limit(count).map(ExporterTestHarness.this::export).collect(Collectors.toList());
     }
   }

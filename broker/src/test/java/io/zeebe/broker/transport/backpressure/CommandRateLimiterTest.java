@@ -16,7 +16,7 @@ import io.zeebe.protocol.record.intent.WorkflowInstanceCreationIntent;
 import java.util.stream.IntStream;
 import org.junit.Test;
 
-public class CommandRateLimiterTest {
+public final class CommandRateLimiterTest {
 
   private static final int INITIAL_LIMIT = 5;
   private final SettableLimit limit = new SettableLimit(INITIAL_LIMIT);
@@ -76,6 +76,16 @@ public class CommandRateLimiterTest {
 
     // then
     assertThat(rateLimiter.tryAcquire(0, 1, JobIntent.COMPLETE)).isTrue();
+  }
+
+  @Test
+  public void shouldAcquireWhenJobFailCommandAfterLimit() {
+    // given
+    IntStream.range(0, limit.getLimit())
+        .forEach(i -> assertThat(rateLimiter.tryAcquire(0, 1, context)).isTrue());
+
+    // then
+    assertThat(rateLimiter.tryAcquire(0, 1, JobIntent.FAIL)).isTrue();
   }
 
   @Test

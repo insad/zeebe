@@ -18,8 +18,10 @@ package io.zeebe.client.impl;
 import static io.zeebe.client.ClientProperties.CA_CERTIFICATE_PATH;
 import static io.zeebe.client.ClientProperties.DEFAULT_MESSAGE_TIME_TO_LIVE;
 import static io.zeebe.client.ClientProperties.DEFAULT_REQUEST_TIMEOUT;
+import static io.zeebe.client.ClientProperties.KEEP_ALIVE;
 import static io.zeebe.client.ClientProperties.USE_PLAINTEXT_CONNECTION;
 
+import io.grpc.ClientInterceptor;
 import io.zeebe.client.ClientProperties;
 import io.zeebe.client.CredentialsProvider;
 import io.zeebe.client.ZeebeClient;
@@ -28,9 +30,17 @@ import io.zeebe.client.ZeebeClientConfiguration;
 import io.zeebe.client.impl.oauth.OAuthCredentialsProviderBuilder;
 import io.zeebe.client.util.Environment;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
-public class ZeebeClientBuilderImpl implements ZeebeClientBuilder, ZeebeClientConfiguration {
+public final class ZeebeClientBuilderImpl implements ZeebeClientBuilder, ZeebeClientConfiguration {
+  public static final String PLAINTEXT_CONNECTION_VAR = "ZEEBE_INSECURE_CONNECTION";
+  public static final String CA_CERTIFICATE_VAR = "ZEEBE_CA_CERTIFICATE_PATH";
+  public static final String KEEP_ALIVE_VAR = "ZEEBE_KEEP_ALIVE";
+
+  private final List<ClientInterceptor> interceptors = new ArrayList<>();
   private String brokerContactPoint = "0.0.0.0:26500";
   private int jobWorkerMaxJobsActive = 32;
   private int numJobWorkerExecutionThreads = 1;
@@ -42,6 +52,7 @@ public class ZeebeClientBuilderImpl implements ZeebeClientBuilder, ZeebeClientCo
   private boolean usePlaintextConnection = false;
   private String certificatePath;
   private CredentialsProvider credentialsProvider;
+  private Duration keepAlive = Duration.ofSeconds(45);
 
   @Override
   public String getBrokerContactPoint() {
@@ -99,6 +110,16 @@ public class ZeebeClientBuilderImpl implements ZeebeClientBuilder, ZeebeClientCo
   }
 
   @Override
+  public Duration getKeepAlive() {
+    return keepAlive;
+  }
+
+  @Override
+  public List<ClientInterceptor> getInterceptors() {
+    return interceptors;
+  }
+
+  @Override
   public ZeebeClientBuilder withProperties(final Properties properties) {
     if (properties.containsKey(ClientProperties.BROKER_CONTACTPOINT)) {
       brokerContactPoint(properties.getProperty(ClientProperties.BROKER_CONTACTPOINT));
@@ -140,7 +161,9 @@ public class ZeebeClientBuilderImpl implements ZeebeClientBuilder, ZeebeClientCo
     if (properties.containsKey(CA_CERTIFICATE_PATH)) {
       caCertificatePath(properties.getProperty(CA_CERTIFICATE_PATH));
     }
-
+    if (properties.containsKey(KEEP_ALIVE)) {
+      keepAlive(properties.getProperty(KEEP_ALIVE));
+    }
     return this;
   }
 
@@ -211,10 +234,45 @@ public class ZeebeClientBuilderImpl implements ZeebeClientBuilder, ZeebeClientCo
   }
 
   @Override
+  public ZeebeClientBuilder keepAlive(final Duration keepAlive) {
+    if (keepAlive.isNegative() || keepAlive.isZero()) {
+      throw new IllegalArgumentException("The keep alive must be a positive number.");
+    }
+
+    this.keepAlive = keepAlive;
+    return this;
+  }
+
+  @Override
+  public ZeebeClientBuilder withInterceptors(final ClientInterceptor... interceptors) {
+    this.interceptors.addAll(Arrays.asList(interceptors));
+    return this;
+  }
+
+  @Override
   public ZeebeClient build() {
+    applyOverrides();
     applyDefaults();
 
     return new ZeebeClientImpl(this);
+  }
+
+  private void keepAlive(final String keepAlive) {
+    keepAlive(Duration.ofMillis(Long.parseUnsignedLong(keepAlive)));
+  }
+
+  private void applyOverrides() {
+    if (Environment.system().isDefined(PLAINTEXT_CONNECTION_VAR)) {
+      usePlaintextConnection = Environment.system().getBoolean(PLAINTEXT_CONNECTION_VAR);
+    }
+
+    if (Environment.system().isDefined(CA_CERTIFICATE_VAR)) {
+      caCertificatePath(Environment.system().get(CA_CERTIFICATE_VAR));
+    }
+
+    if (Environment.system().isDefined(KEEP_ALIVE_VAR)) {
+      keepAlive(Environment.system().get(KEEP_ALIVE_VAR));
+    }
   }
 
   @Override
@@ -259,6 +317,6 @@ public class ZeebeClientBuilderImpl implements ZeebeClientBuilder, ZeebeClientCo
 
   private static void appendProperty(
       final StringBuilder sb, final String propertyName, final Object value) {
-    sb.append(propertyName + ": " + value + "\n");
+    sb.append(propertyName).append(": ").append(value).append("\n");
   }
 }

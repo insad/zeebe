@@ -10,6 +10,7 @@ package io.zeebe.exporter;
 import io.zeebe.protocol.record.Record;
 import io.zeebe.test.util.TestUtil;
 import io.zeebe.test.util.record.RecordingExporter;
+import io.zeebe.test.util.socket.SocketUtil;
 import org.elasticsearch.ElasticsearchStatusException;
 import org.junit.Test;
 
@@ -19,6 +20,7 @@ public class ElasticsearchExporterFaultToleranceIT
   @Test
   public void shouldExportEvenIfElasticNotInitiallyReachable() {
     // given
+    elastic.withPort(SocketUtil.getNextAddress().getPort());
     configuration = getDefaultConfiguration();
     configuration.index.prefix = "zeebe";
     esClient = createElasticsearchClient(configuration);
@@ -37,10 +39,10 @@ public class ElasticsearchExporterFaultToleranceIT
     assertIndexSettings();
   }
 
-  private boolean wasExported(Record<?> record) {
+  private boolean wasExported(final Record<?> record) {
     try {
       return esClient.get(record) != null;
-    } catch (ElasticsearchStatusException e) {
+    } catch (final ElasticsearchStatusException e) {
       // suppress exception in order to retry and see if it was exported yet or not
       // the exception can occur since elastic may not be ready yet, or maybe the index hasn't been
       // created yet, etc.

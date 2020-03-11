@@ -4,25 +4,24 @@ Zeebe supports transport layer security between the gateway and all of the offic
 
 ## Gateway
 
-Transport layer security in the gateway is disabled by default. This means that if you're just experimenting with Zeebe or in development, there's no configuration needed. However, if you'd like to to enable authentication you can configure Zeebe in the `security` section of the configuration files. The following configurations are present in both `gateway.cfg.toml` and `zeebe.cfg.toml`, the file you should edit depends on whether you're using a standalone gateway or an embedded gateway.  
+Transport layer security in the gateway is disabled by default. This means that if you are just experimenting with Zeebe or in development, there is no configuration needed. However, if you want to enable authentication you can configure Zeebe in the `security` section of the configuration files. The following configurations are present in both `gateway.cfg.yaml` and `zeebe.cfg.yaml`, the file you should edit depends on whether you are using a standalone gateway or an embedded gateway.  
 
-```toml
-# Enables TLS authentication between clients and the gateway
-# This setting can also be overridden using the environment variable ZEEBE_GATEWAY_SECURITY_ENABLED. 
-# enabled = false
-#
-# Sets the path to the certificate chain file
-# This setting can also be overridden using the environment variable ZEEBE_GATEWAY_CERTIFICATE_PATH.
-# certificateChainPath = ""
-#
-# Sets the path to the private key file location
-# This setting can also be overridden using the environment variable ZEEBE_GATEWAY_PRIVATE_KEY_PATH. 
-# privateKeyPath = ""
+```yaml
+...
+  security:
+    # Enables TLS authentication between clients and the gateway
+    enabled: false
+
+    # Sets the path to the certificate chain file
+    certificateChainPath:
+
+    # Sets the path to the private key file location
+    privateKeyPath:
 ```
 
 `enabled` should be either `true` or `false`, where true will enable TLS authentication between client and gateway, and false will disable it. `certificateChainPath` and `privateKeyPath` are used to configure the certificate with which the server will authenticate itself. `certificateChainPath` should be a file path pointing to a certificate chain in PEM format representing the server's certificate, and `privateKeyPath` a file path pointing to the certificate's PKCS8 private key, also in PEM format.
 
-Additionally, as you can see in the configuration file, each value can also be configured through an environment variable.
+Additionally, as you can see in the configuration file, each value can also be configured through an environment variable. The environment variable to use again depends on whether you are using a standalone gateway or an embedded gateway.
 
 ## Clients
 
@@ -37,28 +36,28 @@ Without any configuration, the client will look in system's certificate store fo
 
 ```java
 public class SecureClient {
+    public static void main(final String[] args) {
+        final ZeebeClient client = ZeebeClient.newClientBuilder().caCertificatePath("path/to/certificate").build();
 
-  public static void main(final String[] args) {
-    final ZeebeClient client = ZeebeClient.newClientBuilder().caCertificatePath("path/to/certificate").build();
-
-    // continue...  
-  }
+        // continue...  
+    }
 }
 ```
-
+Alternatively, you can use the `ZEEBE_CA_CERTIFICATE_PATH` environment variable to override the code configuration.
 
 In order to disable TLS in a Java client, you can use the `.usePlaintext()` option:
 
 ```java
 public class InsecureClient {
+    public static void main(final String[] args) {
+        final ZeebeClient client = ZeebeClient.newClientBuilder().usePlaintext().build();
 
-  public static void main(final String[] args) {
-    final ZeebeClient client = ZeebeClient.newClientBuilder().usePlaintext().build();
-
-    // continue...
-  }
+        // continue...  
+    }
 }
 ```
+
+Alternatively, you can use the `ZEEBE_INSECURE_CONNECTION` environment variable to override the code configuration. To enable an insecure connection, you can it to "true". To use a secure connection, you can set it any non-empty value other than "true". Setting the environment variable to an empty string is equivalent to unsetting it.
 
 ### Go
 
@@ -73,7 +72,7 @@ import (
 
 
 func main(){
-	client, err := zbc.NewZBClient(&zbc.ZBClientConfig{
+	client, err := zbc.NewZBClientWithConfig(&zbc.ZBClientConfig{
       CaCertificatePath: "path/to/certificate"})
 
   // continue...
@@ -90,12 +89,13 @@ import (
 
 
 func main(){
-	client, err := zbc.NewZBClient(&zbc.ZBClientConfig{UsePlaintextConnection: true})		  
+	client, err := zbc.NewZBClientWithConfig(&zbc.ZBClientConfig{UsePlaintextConnection: true})		  
 
   // continue...
 }
 ```
 
+As in the Java client, you can use the `ZEEBE_INSECURE_CONNECTION` and `ZEEBE_CA_CERTIFICATE_PATH` to override these configurations.
 
 ### zbctl
 
@@ -110,6 +110,8 @@ To configure zbctl to disable TLS:
 ```
 ./zbctl --insecure <command> [arguments]
 ```
+
+Since zbctl is based on the Go client, setting the appropriate environment variables will override these parameters.
 
 ## Troubleshooting authentication issues
 

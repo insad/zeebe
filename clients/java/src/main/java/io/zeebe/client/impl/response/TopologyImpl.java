@@ -21,12 +21,13 @@ import io.zeebe.gateway.protocol.GatewayOuterClass.TopologyResponse;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class TopologyImpl implements Topology {
+public final class TopologyImpl implements Topology {
 
   private final List<BrokerInfo> brokers;
   private final int clusterSize;
   private final int partitionsCount;
   private final int replicationFactor;
+  private final String gatewayVersion;
 
   public TopologyImpl(final TopologyResponse response) {
     brokers =
@@ -34,6 +35,7 @@ public class TopologyImpl implements Topology {
     clusterSize = response.getClusterSize();
     partitionsCount = response.getPartitionsCount();
     replicationFactor = response.getReplicationFactor();
+    gatewayVersion = response.getGatewayVersion();
   }
 
   @Override
@@ -57,6 +59,11 @@ public class TopologyImpl implements Topology {
   }
 
   @Override
+  public String getGatewayVersion() {
+    return gatewayVersion;
+  }
+
+  @Override
   public String toString() {
     return "TopologyImpl{"
         + "brokers="
@@ -67,6 +74,8 @@ public class TopologyImpl implements Topology {
         + partitionsCount
         + ", replicationFactor="
         + replicationFactor
+        + ", gatewayVersion="
+        + gatewayVersion
         + '}';
   }
 }

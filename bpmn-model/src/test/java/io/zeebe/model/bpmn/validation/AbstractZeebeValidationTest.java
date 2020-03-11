@@ -24,6 +24,7 @@ import io.zeebe.model.bpmn.validation.zeebe.ZeebeDesignTimeValidators;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -46,7 +47,7 @@ public abstract class AbstractZeebeValidationTest {
   @Parameter(1)
   public List<ExpectedValidationResult> expectedResults;
 
-  private static ValidationResults validate(BpmnModelInstance model) {
+  private static ValidationResults validate(final BpmnModelInstance model) {
     final ModelWalker walker = new ModelWalker(model);
     final ValidationVisitor visitor = new ValidationVisitor(ZeebeDesignTimeValidators.VALIDATORS);
     walker.walk(visitor);
@@ -120,7 +121,8 @@ public abstract class AbstractZeebeValidationTest {
     fail(sb.toString());
   }
 
-  private static void describeUnmatchedResults(StringBuilder sb, List<ValidationResult> results) {
+  private static void describeUnmatchedResults(
+      final StringBuilder sb, final List<ValidationResult> results) {
     sb.append("Unmatched results:\n");
     results.forEach(
         e -> {
@@ -130,12 +132,16 @@ public abstract class AbstractZeebeValidationTest {
   }
 
   private static void describeUnmatchedExpectations(
-      StringBuilder sb, List<ExpectedValidationResult> expectations) {
+      final StringBuilder sb, final List<ExpectedValidationResult> expectations) {
     sb.append("Unmatched expectations:\n");
     expectations.forEach(
         e -> {
           sb.append(e);
           sb.append("\n");
         });
+  }
+
+  protected static List<ExpectedValidationResult> valid() {
+    return Collections.emptyList();
   }
 }

@@ -24,11 +24,11 @@ import org.junit.rules.ExpectedException;
 import org.msgpack.core.MessagePack;
 import org.msgpack.core.MessagePacker;
 
-public class MsgPackConverterTest {
+public final class MsgPackConverterTest {
 
-  protected static final String JSON = "{\"key1\":1,\"key2\":2}";
-  protected static final byte[] MSG_PACK = createMsgPack();
-  @Rule public ExpectedException exception = ExpectedException.none();
+  private static final String JSON = "{\"key1\":1,\"key2\":2}";
+  private static final byte[] MSG_PACK = createMsgPack();
+  @Rule public final ExpectedException exception = ExpectedException.none();
 
   @Test
   public void shouldConvertFromJsonStringToMsgPack() {
@@ -139,27 +139,17 @@ public class MsgPackConverterTest {
     MsgPackConverter.convertToMsgPack("}");
   }
 
-  @Test
-  public void shouldThrowExceptionIfDocumentHasMoreThanOneObject() {
-    // then
-    exception.expect(RuntimeException.class);
-    exception.expectMessage("Failed to convert JSON to MessagePack");
-
-    // when
-    MsgPackConverter.convertToMsgPack("{}{}");
-  }
-
-  protected static byte[] createMsgPack() {
+  private static byte[] createMsgPack() {
     byte[] msgPack = null;
 
-    try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+    try (final ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
       final MessagePacker variablesPacker = MessagePack.newDefaultPacker(outputStream);
 
       variablesPacker.packMapHeader(2).packString("key1").packInt(1).packString("key2").packInt(2);
 
       variablesPacker.flush();
       msgPack = outputStream.toByteArray();
-    } catch (Exception e) {
+    } catch (final Exception e) {
       LangUtil.rethrowUnchecked(e);
     }
     return msgPack;

@@ -16,22 +16,22 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
-public class SnapshotChunkImpl
+public final class SnapshotChunkImpl
     extends SbeBufferWriterReader<SnapshotChunkEncoder, SnapshotChunkDecoder>
     implements SnapshotChunk {
 
   private final SnapshotChunkEncoder encoder = new SnapshotChunkEncoder();
   private final SnapshotChunkDecoder decoder = new SnapshotChunkDecoder();
   private final DirectBuffer content = new UnsafeBuffer(0, 0);
-  private long snapshotPosition;
+  private String snapshotId;
   private int totalCount;
   private String chunkName;
   private long checksum;
 
   public SnapshotChunkImpl() {}
 
-  public SnapshotChunkImpl(SnapshotChunk chunk) {
-    snapshotPosition = chunk.getSnapshotPosition();
+  public SnapshotChunkImpl(final SnapshotChunk chunk) {
+    snapshotId = chunk.getSnapshotId();
     totalCount = chunk.getTotalCount();
     chunkName = chunk.getChunkName();
     checksum = chunk.getChecksum();
@@ -52,10 +52,10 @@ public class SnapshotChunkImpl
   public void reset() {
     super.reset();
 
-    snapshotPosition = SnapshotChunkDecoder.snapshotPositionNullValue();
     totalCount = SnapshotChunkDecoder.totalCountNullValue();
     checksum = SnapshotChunkDecoder.checksumNullValue();
 
+    snapshotId = "";
     chunkName = "";
     content.wrap(0, 0);
   }
@@ -63,6 +63,8 @@ public class SnapshotChunkImpl
   @Override
   public int getLength() {
     return super.getLength()
+        + SnapshotChunkEncoder.snapshotIdHeaderLength()
+        + snapshotId.length()
         + SnapshotChunkEncoder.chunkNameHeaderLength()
         + chunkName.length()
         + SnapshotChunkEncoder.contentHeaderLength()
@@ -70,31 +72,34 @@ public class SnapshotChunkImpl
   }
 
   @Override
-  public void write(MutableDirectBuffer buffer, int offset) {
+  public void write(final MutableDirectBuffer buffer, final int offset) {
     super.write(buffer, offset);
 
     encoder
-        .snapshotPosition(snapshotPosition)
         .totalCount(totalCount)
+        .snapshotId(snapshotId)
         .chunkName(chunkName)
         .checksum(checksum)
         .putContent(content, 0, content.capacity());
   }
 
   @Override
-  public void wrap(DirectBuffer buffer, int offset, int length) {
+  public void wrap(final DirectBuffer buffer, final int offset, final int length) {
     super.wrap(buffer, offset, length);
 
-    snapshotPosition = decoder.snapshotPosition();
     totalCount = decoder.totalCount();
+    snapshotId = decoder.snapshotId();
     chunkName = decoder.chunkName();
     checksum = decoder.checksum();
-    decoder.wrapContent(content);
+
+    if (decoder.contentLength() > 0) {
+      decoder.wrapContent(content);
+    }
   }
 
   @Override
-  public long getSnapshotPosition() {
-    return snapshotPosition;
+  public String getSnapshotId() {
+    return snapshotId;
   }
 
   @Override
@@ -120,8 +125,8 @@ public class SnapshotChunkImpl
   @Override
   public String toString() {
     return "SnapshotChunkImpl{"
-        + "snapshotPosition="
-        + snapshotPosition
+        + "snapshotId="
+        + snapshotId
         + ", totalCount="
         + totalCount
         + ", chunkName='"

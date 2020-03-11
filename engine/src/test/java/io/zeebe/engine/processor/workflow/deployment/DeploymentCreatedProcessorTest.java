@@ -28,20 +28,22 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class DeploymentCreatedProcessorTest {
+public final class DeploymentCreatedProcessorTest {
   public static final String PROCESS_ID = "process";
   public static final String RESOURCE_ID = "process.bpmn";
   public static final String MESSAGE_NAME = "msg";
 
   @Rule
-  public StreamProcessorRule rule = new StreamProcessorRule(Protocol.DEPLOYMENT_PARTITION + 1);
+  public final StreamProcessorRule rule =
+      new StreamProcessorRule(Protocol.DEPLOYMENT_PARTITION + 1);
 
   private WorkflowState workflowState;
 
   @Before
   public void setUp() {
     rule.startTypedStreamProcessor(
-        (typedRecordProcessors, zeebeState) -> {
+        (typedRecordProcessors, processingContext) -> {
+          final var zeebeState = processingContext.getZeebeState();
           workflowState = zeebeState.getWorkflowState();
 
           DeploymentEventProcessors.addDeploymentCreateProcessor(

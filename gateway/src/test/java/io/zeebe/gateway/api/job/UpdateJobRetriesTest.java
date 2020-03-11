@@ -18,13 +18,13 @@ import io.zeebe.protocol.record.ValueType;
 import io.zeebe.protocol.record.intent.JobIntent;
 import org.junit.Test;
 
-public class UpdateJobRetriesTest extends GatewayTest {
+public final class UpdateJobRetriesTest extends GatewayTest {
 
   @Test
   public void shouldMapRequestAndResponse() {
     // given
     final UpdateJobRetriesStub stub = new UpdateJobRetriesStub();
-    stub.registerWith(gateway);
+    stub.registerWith(brokerClient);
 
     final int retries = 123;
 
@@ -37,7 +37,7 @@ public class UpdateJobRetriesTest extends GatewayTest {
     // then
     assertThat(response).isNotNull();
 
-    final BrokerUpdateJobRetriesRequest brokerRequest = gateway.getSingleBrokerRequest();
+    final BrokerUpdateJobRetriesRequest brokerRequest = brokerClient.getSingleBrokerRequest();
     assertThat(brokerRequest.getKey()).isEqualTo(stub.getKey());
     assertThat(brokerRequest.getIntent()).isEqualTo(JobIntent.UPDATE_RETRIES);
     assertThat(brokerRequest.getValueType()).isEqualTo(ValueType.JOB);

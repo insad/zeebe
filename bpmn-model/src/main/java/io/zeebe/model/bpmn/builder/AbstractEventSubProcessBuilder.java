@@ -21,12 +21,13 @@ import io.zeebe.model.bpmn.instance.StartEvent;
 import io.zeebe.model.bpmn.instance.SubProcess;
 import io.zeebe.model.bpmn.instance.bpmndi.BpmnShape;
 import io.zeebe.model.bpmn.instance.dc.Bounds;
+import java.util.function.Consumer;
 
 public class AbstractEventSubProcessBuilder<B extends AbstractEventSubProcessBuilder<B>>
     extends AbstractFlowElementBuilder<B, SubProcess> {
 
   protected AbstractEventSubProcessBuilder(
-      BpmnModelInstance modelInstance, SubProcess element, Class<?> selfType) {
+      final BpmnModelInstance modelInstance, final SubProcess element, final Class<?> selfType) {
     super(modelInstance, element, selfType);
   }
 
@@ -34,7 +35,7 @@ public class AbstractEventSubProcessBuilder<B extends AbstractEventSubProcessBui
     return startEvent(null);
   }
 
-  public StartEventBuilder startEvent(String id) {
+  public StartEventBuilder startEvent(final String id) {
     final StartEvent start = createChild(StartEvent.class, id);
 
     final BpmnShape startShape = createBpmnShape(start);
@@ -54,5 +55,11 @@ public class AbstractEventSubProcessBuilder<B extends AbstractEventSubProcessBui
     }
 
     return start.builder();
+  }
+
+  public StartEventBuilder startEvent(final String id, final Consumer<StartEventBuilder> consumer) {
+    final StartEventBuilder builder = startEvent(id);
+    consumer.accept(builder);
+    return builder;
   }
 }

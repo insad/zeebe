@@ -19,16 +19,17 @@ import io.grpc.stub.StreamObserver;
 import io.zeebe.client.api.ZeebeFuture;
 import io.zeebe.client.api.command.FinalCommandStep;
 import io.zeebe.client.api.command.ResolveIncidentCommandStep1;
+import io.zeebe.client.api.response.ResolveIncidentResponse;
 import io.zeebe.client.impl.RetriableClientFutureImpl;
 import io.zeebe.gateway.protocol.GatewayGrpc.GatewayStub;
+import io.zeebe.gateway.protocol.GatewayOuterClass;
 import io.zeebe.gateway.protocol.GatewayOuterClass.ResolveIncidentRequest;
 import io.zeebe.gateway.protocol.GatewayOuterClass.ResolveIncidentRequest.Builder;
-import io.zeebe.gateway.protocol.GatewayOuterClass.ResolveIncidentResponse;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
-public class ResolveIncidentCommandImpl implements ResolveIncidentCommandStep1 {
+public final class ResolveIncidentCommandImpl implements ResolveIncidentCommandStep1 {
 
   private final GatewayStub asyncStub;
   private final Builder builder;
@@ -36,10 +37,10 @@ public class ResolveIncidentCommandImpl implements ResolveIncidentCommandStep1 {
   private Duration requestTimeout;
 
   public ResolveIncidentCommandImpl(
-      GatewayStub asyncStub,
-      long incidentKey,
-      Duration requestTimeout,
-      Predicate<Throwable> retryPredicate) {
+      final GatewayStub asyncStub,
+      final long incidentKey,
+      final Duration requestTimeout,
+      final Predicate<Throwable> retryPredicate) {
     this.asyncStub = asyncStub;
     this.builder = ResolveIncidentRequest.newBuilder().setIncidentKey(incidentKey);
     this.requestTimeout = requestTimeout;
@@ -47,25 +48,28 @@ public class ResolveIncidentCommandImpl implements ResolveIncidentCommandStep1 {
   }
 
   @Override
-  public FinalCommandStep<Void> requestTimeout(Duration requestTimeout) {
+  public FinalCommandStep<ResolveIncidentResponse> requestTimeout(final Duration requestTimeout) {
     this.requestTimeout = requestTimeout;
     return this;
   }
 
   @Override
-  public ZeebeFuture<Void> send() {
+  public ZeebeFuture<ResolveIncidentResponse> send() {
     final ResolveIncidentRequest request = builder.build();
 
-    final RetriableClientFutureImpl<Void, ResolveIncidentResponse> future =
-        new RetriableClientFutureImpl<>(
-            retryPredicate, streamObserver -> send(request, streamObserver));
+    final RetriableClientFutureImpl<
+            ResolveIncidentResponse, GatewayOuterClass.ResolveIncidentResponse>
+        future =
+            new RetriableClientFutureImpl<>(
+                retryPredicate, streamObserver -> send(request, streamObserver));
 
     send(request, future);
     return future;
   }
 
   private void send(
-      ResolveIncidentRequest request, StreamObserver<ResolveIncidentResponse> streamObserver) {
+      final ResolveIncidentRequest request,
+      final StreamObserver<GatewayOuterClass.ResolveIncidentResponse> streamObserver) {
     asyncStub
         .withDeadlineAfter(requestTimeout.toMillis(), TimeUnit.MILLISECONDS)
         .resolveIncident(request, streamObserver);

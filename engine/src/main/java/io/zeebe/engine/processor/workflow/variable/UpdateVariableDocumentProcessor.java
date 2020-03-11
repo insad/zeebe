@@ -20,31 +20,31 @@ import io.zeebe.protocol.record.intent.VariableDocumentIntent;
 import io.zeebe.protocol.record.value.VariableDocumentUpdateSemantic;
 import org.agrona.DirectBuffer;
 
-public class UpdateVariableDocumentProcessor implements CommandProcessor<VariableDocumentRecord> {
+public final class UpdateVariableDocumentProcessor
+    implements CommandProcessor<VariableDocumentRecord> {
   private final ElementInstanceState elementInstanceState;
   private final VariablesState variablesState;
 
   public UpdateVariableDocumentProcessor(
-      ElementInstanceState elementInstanceState, VariablesState variablesState) {
+      final ElementInstanceState elementInstanceState, final VariablesState variablesState) {
     this.elementInstanceState = elementInstanceState;
     this.variablesState = variablesState;
   }
 
   @Override
-  public void onCommand(
-      TypedRecord<VariableDocumentRecord> command,
-      CommandControl<VariableDocumentRecord> controller) {
+  public boolean onCommand(
+      final TypedRecord<VariableDocumentRecord> command,
+      final CommandControl<VariableDocumentRecord> controller) {
     final VariableDocumentRecord record = command.getValue();
 
     final ElementInstance scope = elementInstanceState.getInstance(record.getScopeKey());
-    if (scope == null) {
+    if (scope == null || scope.isTerminating() || scope.isInFinalState()) {
       controller.reject(
           RejectionType.NOT_FOUND,
           String.format(
               "Expected to update variables for element with key '%d', but no such element was found",
               record.getScopeKey()));
-
-      return;
+      return true;
     }
 
     final long workflowKey = scope.getValue().getWorkflowKey();
@@ -52,17 +52,18 @@ public class UpdateVariableDocumentProcessor implements CommandProcessor<Variabl
     if (mergeDocument(record, workflowKey, controller)) {
       controller.accept(VariableDocumentIntent.UPDATED, record);
     }
+    return true;
   }
 
   private boolean mergeDocument(
-      VariableDocumentRecord record,
-      long workflowKey,
-      CommandControl<VariableDocumentRecord> controller) {
+      final VariableDocumentRecord record,
+      final long workflowKey,
+      final CommandControl<VariableDocumentRecord> controller) {
     try {
       getUpdateOperation(record.getUpdateSemantics())
           .apply(record.getScopeKey(), workflowKey, record.getVariablesBuffer());
       return true;
-    } catch (MsgpackReaderException e) {
+    } catch (final MsgpackReaderException e) {
       Loggers.WORKFLOW_PROCESSOR_LOGGER.error(
           "Expected to merge variable document for scope '{}', but its document could not be read",
           record.getScopeKey(),
@@ -77,7 +78,7 @@ public class UpdateVariableDocumentProcessor implements CommandProcessor<Variabl
     }
   }
 
-  private UpdateOperation getUpdateOperation(VariableDocumentUpdateSemantic updateSemantics) {
+  private UpdateOperation getUpdateOperation(final VariableDocumentUpdateSemantic updateSemantics) {
     switch (updateSemantics) {
       case LOCAL:
         return variablesState::setVariablesLocalFromDocument;

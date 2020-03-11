@@ -11,7 +11,6 @@ import static io.zeebe.protocol.record.ExecuteCommandResponseEncoder.keyNullValu
 import static io.zeebe.protocol.record.ExecuteCommandResponseEncoder.partitionIdNullValue;
 import static io.zeebe.protocol.record.ExecuteCommandResponseEncoder.valueHeaderLength;
 
-import io.zeebe.broker.transport.backpressure.RequestLimiter;
 import io.zeebe.engine.processor.CommandResponseWriter;
 import io.zeebe.protocol.Protocol;
 import io.zeebe.protocol.record.ExecuteCommandResponseEncoder;
@@ -21,21 +20,20 @@ import io.zeebe.protocol.record.RejectionType;
 import io.zeebe.protocol.record.ValueType;
 import io.zeebe.protocol.record.intent.Intent;
 import io.zeebe.transport.ServerOutput;
-import io.zeebe.transport.ServerResponse;
+import io.zeebe.transport.impl.ServerResponseImpl;
 import io.zeebe.util.buffer.BufferWriter;
 import java.util.Objects;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
-public class CommandResponseWriterImpl implements CommandResponseWriter, BufferWriter {
+public final class CommandResponseWriterImpl implements CommandResponseWriter, BufferWriter {
 
   private final MessageHeaderEncoder messageHeaderEncoder = new MessageHeaderEncoder();
   private final ExecuteCommandResponseEncoder responseEncoder = new ExecuteCommandResponseEncoder();
-  private final ServerResponse response = new ServerResponse();
+  private final ServerResponseImpl response = new ServerResponseImpl();
   private final ServerOutput output;
   private final UnsafeBuffer rejectionReason = new UnsafeBuffer(0, 0);
-  private final RequestLimiter limiter;
   private int partitionId = partitionIdNullValue();
   private long key = keyNullValue();
   private BufferWriter valueWriter;
@@ -44,9 +42,8 @@ public class CommandResponseWriterImpl implements CommandResponseWriter, BufferW
   private short intent = Intent.NULL_VAL;
   private RejectionType rejectionType = RejectionType.NULL_VAL;
 
-  public CommandResponseWriterImpl(final ServerOutput output, RequestLimiter limiter) {
+  public CommandResponseWriterImpl(final ServerOutput output) {
     this.output = output;
-    this.limiter = limiter;
   }
 
   @Override
@@ -102,13 +99,13 @@ public class CommandResponseWriterImpl implements CommandResponseWriter, BufferW
     Objects.requireNonNull(valueWriter);
 
     try {
-      limiter.onResponse(remoteStreamId, requestId);
-      response.reset().remoteStreamId(remoteStreamId).requestId(requestId).writer(this);
+      response.reset().setPartitionId(remoteStreamId).setRequestId(requestId).writer(this);
 
-      return output.sendResponse(response);
+      output.sendResponse(response);
     } finally {
       reset();
     }
+    return true;
   }
 
   @Override

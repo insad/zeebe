@@ -18,7 +18,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 
-public class ExporterRepository {
+public final class ExporterRepository {
   private static final Logger LOG = Loggers.EXPORTER_LOGGER;
   private final ExporterJarRepository jarRepository;
   private final Map<String, ExporterDescriptor> exporters;
@@ -59,9 +59,8 @@ public class ExporterRepository {
     return descriptor;
   }
 
-  public ExporterDescriptor load(final ExporterCfg config)
+  public ExporterDescriptor load(final String id, final ExporterCfg config)
       throws ExporterLoadException, ExporterJarLoadException {
-    final String id = config.getId();
     final ClassLoader classLoader;
     final Class<? extends Exporter> exporterClass;
 
@@ -78,7 +77,7 @@ public class ExporterRepository {
     try {
       final Class<?> specifiedClass = classLoader.loadClass(config.getClassName());
       exporterClass = specifiedClass.asSubclass(Exporter.class);
-    } catch (ClassNotFoundException | ClassCastException e) {
+    } catch (final ClassNotFoundException | ClassCastException e) {
       throw new ExporterLoadException(id, "cannot load specified class", e);
     }
 

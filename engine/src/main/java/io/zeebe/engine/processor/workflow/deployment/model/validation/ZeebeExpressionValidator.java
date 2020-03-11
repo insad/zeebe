@@ -7,35 +7,81 @@
  */
 package io.zeebe.engine.processor.workflow.deployment.model.validation;
 
-import io.zeebe.msgpack.el.CompiledJsonCondition;
-import io.zeebe.msgpack.el.JsonConditionFactory;
-import io.zeebe.msgpack.jsonpath.JsonPathQuery;
-import io.zeebe.msgpack.jsonpath.JsonPathQueryCompiler;
+import io.zeebe.el.ExpressionLanguage;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
+import org.camunda.bpm.model.xml.instance.ModelElementInstance;
+import org.camunda.bpm.model.xml.validation.ModelElementValidator;
 import org.camunda.bpm.model.xml.validation.ValidationResultCollector;
 
-public class ZeebeExpressionValidator {
+public final class ZeebeExpressionValidator<T extends ModelElementInstance>
+    implements ModelElementValidator<T> {
 
-  public void validateExpression(String expression, ValidationResultCollector resultCollector) {
-    final CompiledJsonCondition condition = JsonConditionFactory.createCondition(expression);
+  private final ExpressionLanguage expressionLanguage;
+  private final Class<T> elementType;
+  private final List<Function<T, String>> expressionSuppliers;
 
-    if (!condition.isValid()) {
-      resultCollector.addError(
-          0, String.format("Condition expression is invalid: %s", condition.getErrorMessage()));
-    }
+  private ZeebeExpressionValidator(
+      final ExpressionLanguage expressionLanguage,
+      final Class<T> elementType,
+      final List<Function<T, String>> expressionSuppliers) {
+    this.expressionLanguage = expressionLanguage;
+    this.elementType = elementType;
+    this.expressionSuppliers = expressionSuppliers;
   }
 
-  public void validateJsonPath(String jsonPath, ValidationResultCollector resultCollector) {
-    if (jsonPath == null) {
-      resultCollector.addError(0, String.format("JSON path query is empty"));
+  private void validateExpression(
+      final String expression, final ValidationResultCollector resultCollector) {
+
+    if (expression == null || expression.isEmpty()) {
       return;
     }
 
-    final JsonPathQueryCompiler queryCompiler = new JsonPathQueryCompiler();
-    final JsonPathQuery compiledQuery = queryCompiler.compile(jsonPath);
+    final var parseResult = expressionLanguage.parseExpression(expression);
 
-    if (!compiledQuery.isValid()) {
-      resultCollector.addError(
-          0, String.format("JSON path query is invalid: %s", compiledQuery.getErrorReason()));
+    if (!parseResult.isValid()) {
+      resultCollector.addError(0, parseResult.getFailureMessage());
+    }
+  }
+
+  @Override
+  public Class<T> getElementType() {
+    return elementType;
+  }
+
+  @Override
+  public void validate(final T element, final ValidationResultCollector validationResultCollector) {
+
+    expressionSuppliers.forEach(
+        supplier -> {
+          final var expression = supplier.apply(element);
+          validateExpression(expression, validationResultCollector);
+        });
+  }
+
+  public static <T extends ModelElementInstance> ZeebeExpressionValidator.Builder<T> verifyThat(
+      final Class<T> elementType) {
+    return new ZeebeExpressionValidator.Builder<>(elementType);
+  }
+
+  public static class Builder<T extends ModelElementInstance> {
+
+    private final Class<T> elementType;
+    private final List<Function<T, String>> expressionSuppliers = new ArrayList<>();
+
+    public Builder(final Class<T> elementType) {
+      this.elementType = elementType;
+    }
+
+    public Builder<T> hasValidExpression(final Function<T, String> expressionSupplier) {
+      expressionSuppliers.add(expressionSupplier);
+      return this;
+    }
+
+    public ZeebeExpressionValidator<T> build(final ExpressionLanguage expressionLanguage) {
+
+      return new ZeebeExpressionValidator<>(expressionLanguage, elementType, expressionSuppliers);
     }
   }
 }

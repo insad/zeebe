@@ -38,7 +38,7 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
-public class MessageOutputMappingTest {
+public final class MessageOutputMappingTest {
 
   @ClassRule public static final EngineRule ENGINE_RULE = EngineRule.singlePartition();
   private static final String PROCESS_ID = "process";
@@ -103,6 +103,12 @@ public class MessageOutputMappingTest {
         mapping(b -> b.zeebeOutput("x.y", "y")),
         activityVariables(tuple("x", "{\"y\":2}")),
         scopeVariables(tuple("y", "2"))
+      },
+      {
+        "{'x': 1, 'y': 2}",
+        mapping(b -> b.zeebeOutput("x", "z.x").zeebeOutput("y", "z.y")),
+        activityVariables(tuple("x", "1"), tuple("y", "2")),
+        scopeVariables(tuple("z", "{\"x\":1,\"y\":2}"))
       },
       // update variable
       {"{'i': 1}", mapping(b -> {}), activityVariables(), scopeVariables(tuple("i", "1"))},
@@ -206,15 +212,15 @@ public class MessageOutputMappingTest {
   }
 
   private static Consumer<ZeebeVariablesMappingBuilder<IntermediateCatchEventBuilder>> mapping(
-      Consumer<ZeebeVariablesMappingBuilder<IntermediateCatchEventBuilder>> mappingBuilder) {
+      final Consumer<ZeebeVariablesMappingBuilder<IntermediateCatchEventBuilder>> mappingBuilder) {
     return mappingBuilder;
   }
 
-  private static List<Tuple> activityVariables(Tuple... variables) {
+  private static List<Tuple> activityVariables(final Tuple... variables) {
     return Arrays.asList(variables);
   }
 
-  private static List<Tuple> scopeVariables(Tuple... variables) {
+  private static List<Tuple> scopeVariables(final Tuple... variables) {
     return Arrays.asList(variables);
   }
 }
